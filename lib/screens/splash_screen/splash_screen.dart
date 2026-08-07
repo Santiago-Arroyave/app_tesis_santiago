@@ -57,7 +57,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ),
 
-          // 🔄 Loader abajo (opcional)
+          // 🔄 Loader abajo 
           Positioned(
             bottom: 40,
             left: 0,
