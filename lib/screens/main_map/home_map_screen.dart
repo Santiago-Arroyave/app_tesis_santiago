@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
+import 'dart:typed_data';
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -38,6 +39,12 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
       if (!mounted) return;
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
+
+        debugPrint('========================================');
+        debugPrint('RESPUESTA API REPORTES:');
+        debugPrint(const JsonEncoder.withIndent('  ').convert(body));
+        debugPrint('========================================');
+
         List<dynamic> data;
         if (body is List) {
           data = body;
@@ -67,7 +74,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
       case 'media':
         return Colors.orange;
       case 'baja':
-        return Colors.green;
+        return Color.fromARGB(255, 7, 83, 11);
       default:
         return Colors.blue;
     }
@@ -84,7 +91,260 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     return map[categoria] ?? 'assets/images/Oso de anteojos-2.jpeg';
   }
 
+  Uint8List? _getObservationImage(Map<String, dynamic> reporte) {
+    try {
+      String? base64Image;
+
+      // 1. Primero intentamos tomar la imagen principal
+      final fotoPrincipal = reporte['fotoPrincipalUrl'];
+
+      if (fotoPrincipal != null && fotoPrincipal.toString().trim().isNotEmpty) {
+        base64Image = fotoPrincipal.toString().trim();
+      }
+
+      // 2. Si no existe, buscamos en evidencias
+      if (base64Image == null) {
+        final evidencias = reporte['evidencias'];
+
+        if (evidencias is List && evidencias.isNotEmpty) {
+          for (final evidencia in evidencias) {
+            if (evidencia is Map &&
+                evidencia['tipoArchivo']?.toString().toLowerCase() ==
+                    'imagen' &&
+                evidencia['archivoBase64'] != null &&
+                evidencia['archivoBase64'].toString().trim().isNotEmpty) {
+              base64Image = evidencia['archivoBase64'].toString().trim();
+              break;
+            }
+          }
+        }
+      }
+
+      if (base64Image == null || base64Image.isEmpty) {
+        return null;
+      }
+
+      // Por si algún día el backend envía:
+      // data:image/jpeg;base64,...
+      if (base64Image.contains(',')) {
+        base64Image = base64Image.split(',').last;
+      }
+
+      return base64Decode(base64Image);
+    } catch (e) {
+      debugPrint('Error al decodificar imagen del reporte: $e');
+      return null;
+    }
+  }
+
+  String? _observationImage(Map<String, dynamic> reporte) {
+    // Posibles nombres de campo para una imagen individual
+    final possibleFields = [
+      'imagenUrl',
+      'imagen',
+      'fotoUrl',
+      'foto',
+      'imagenReporte',
+      'evidenciaUrl',
+    ];
+
+    for (final field in possibleFields) {
+      final value = reporte[field];
+
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return _resolveImageUrl(value.toString());
+      }
+    }
+
+    // Si el backend devuelve una lista de evidencias/imágenes
+    final possibleLists = [
+      'imagenes',
+      'evidencias',
+      'evidenciasReporte',
+      'fotos',
+    ];
+
+    for (final field in possibleLists) {
+      final value = reporte[field];
+
+      if (value is List && value.isNotEmpty) {
+        final first = value.first;
+
+        if (first is String && first.trim().isNotEmpty) {
+          return _resolveImageUrl(first);
+        }
+
+        if (first is Map<String, dynamic>) {
+          final imageValue =
+              first['url'] ??
+              first['imagenUrl'] ??
+              first['imagen'] ??
+              first['ruta'] ??
+              first['path'];
+
+          if (imageValue != null && imageValue.toString().trim().isNotEmpty) {
+            return _resolveImageUrl(imageValue.toString());
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  String _resolveImageUrl(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    if (url.startsWith('/')) {
+      return '$_baseUrl$url';
+    }
+
+    return '$_baseUrl/$url';
+  }
+
   void _showObservationDetail(Map<String, dynamic> reporte) {
+    final Uint8List? observationImage = _getObservationImage(reporte);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          height: 104,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // =====================================================
+              // IMAGEN PRINCIPAL DE LA OBSERVACIÓN
+              // =====================================================
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 82,
+                  height: 82,
+                  child: observationImage != null
+                      ? Image.memory(
+                          observationImage,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        )
+                      : Container(
+                          color: Colors.grey.shade200,
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.grey.shade500,
+                            size: 30,
+                          ),
+                        ),
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              // =====================================================
+              // INFORMACIÓN
+              // =====================================================
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        reporte['titulo']?.toString().isNotEmpty == true
+                            ? reporte['titulo'].toString()
+                            : 'Observación',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      Row(
+                        children: [
+                          Text(
+                            'Prioridad ${reporte['prioridadNombre'] ?? ''}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          const SizedBox(width: 4),
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: _priorityColor(reporte['prioridadNombre']),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        'Estado: ${reporte['estadoReporteNombre'] ?? 'Pendiente'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        'Fecha: ${reporte['fechaEvento'] != null ? reporte['fechaEvento'].toString().substring(0, 10) : ''}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // =====================================================
+              // CATEGORÍA - PEQUEÑA Y ARRIBA A LA DERECHA
+              // =====================================================
+              Padding(
+                padding: const EdgeInsets.only(top: 0, right: 0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: Image.asset(
+                    _categoryImage(reporte['categoriaNombre']?.toString()),
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /*void _showObservationDetail(Map<String, dynamic> reporte) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -182,7 +442,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
         ),
       ),
     );
-  }
+  }*/
 
   @override
   Widget build(BuildContext context) {
@@ -283,7 +543,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
           child: FloatingActionButton.small(
             onPressed: _loadReportes,
             backgroundColor: Colors.white,
-            child: Icon(Icons.refresh, color: Colors.green.shade700),
+            child: Icon(Icons.refresh, color: Color.fromARGB(255, 7, 83, 11)),
           ),
         ),
       ],

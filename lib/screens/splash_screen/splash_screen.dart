@@ -42,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
               children: [
                 Image.asset(
                   'assets/images/Logo Blanco.png', // tu logo
-                  width: 150,
+                  width: 200,
                 ),
                 SizedBox(height: 20),
                 Text(

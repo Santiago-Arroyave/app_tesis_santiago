@@ -378,12 +378,12 @@ class _ProjectScreenState extends State<ProjectScreen>
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: const Color.fromARGB(255, 7, 83, 11),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.eco,
-                    color: Colors.green.shade700,
+                    color: const Color.fromARGB(255, 7, 83, 11),
                     size: 28,
                   ),
                 ),
@@ -448,8 +448,8 @@ class _ProjectScreenState extends State<ProjectScreen>
                         style: TextStyle(fontSize: 12),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.green.shade700,
-                        side: BorderSide(color: Colors.green.shade400),
+                        foregroundColor: const Color.fromARGB(255, 7, 83, 11),
+                        side: BorderSide(color: const Color.fromARGB(255, 7, 83, 11)),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 4,
@@ -464,7 +464,7 @@ class _ProjectScreenState extends State<ProjectScreen>
                     ElevatedButton(
                       onPressed: () => _requestJoin(p),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
+                        backgroundColor: const Color.fromARGB(255, 7, 83, 11),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -727,7 +727,7 @@ class _ProjectScreenState extends State<ProjectScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.send_rounded, color: Colors.green.shade600, size: 48),
+            Icon(Icons.send_rounded, color: const Color.fromARGB(255, 7, 83, 11), size: 48),
             const SizedBox(height: 12),
             Text(
               '¿Solicitar unirte a\n"${proyecto['nombre']}"?',
@@ -744,7 +744,7 @@ class _ProjectScreenState extends State<ProjectScreen>
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade600,
+              backgroundColor: const Color.fromARGB(255, 7, 83, 11),
               foregroundColor: Colors.white,
             ),
             child: const Text('Enviar solicitud'),
@@ -791,7 +791,7 @@ class _ProjectScreenState extends State<ProjectScreen>
               children: [
                 Icon(
                   Icons.check_circle_rounded,
-                  color: Colors.green.shade600,
+                  color: const Color.fromARGB(255, 7, 83, 11),
                   size: 64,
                 ),
                 const SizedBox(height: 12),
@@ -974,7 +974,7 @@ class _ProjectScreenState extends State<ProjectScreen>
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.green.shade700),
+            icon: Icon(Icons.refresh, color: Color.fromARGB(255, 7, 83, 11)),
             onPressed: () {
               _loadAllProjects();
               _loadMyProjects();
@@ -984,9 +984,9 @@ class _ProjectScreenState extends State<ProjectScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.green.shade700,
+          labelColor: Color.fromARGB(255, 7, 83, 11),
           unselectedLabelColor: Colors.grey.shade500,
-          indicatorColor: Colors.green.shade700,
+          indicatorColor: Color.fromARGB(255, 7, 83, 11),
           tabs: const [
             Tab(text: 'Proyectos'),
             Tab(text: 'Mis proyectos'),

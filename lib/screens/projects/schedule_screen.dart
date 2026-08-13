@@ -239,6 +239,8 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
   List<File> _photos = [];
   bool _saving = false;
   String? _errorMessage;
+  bool _isEditing =
+      false; // ← se agrega esto para controlar si se está editando
 
   @override
   void initState() {
@@ -701,6 +703,60 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
           style: TextStyle(fontWeight: FontWeight.w500),
         ),
         actions: [
+          if (readOnly && !_isEditing) ...[
+            // Botón editar cuando está completada
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+              onPressed: () => setState(() => _isEditing = true),
+              tooltip: 'Editar',
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Chip(
+                label: const Text(
+                  'Completada',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+                backgroundColor: Colors.green.shade600,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ] else if (_isEditing || !readOnly) ...[
+            if (_saving)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else ...[
+              // Cancelar edición
+              if (_isEditing)
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  onPressed: () => setState(() {
+                    _isEditing = false;
+                    _photos = [];
+                    _descController.text =
+                        widget.actividad['descripcion'] ?? '';
+                    _obsController.text = '';
+                  }),
+                ),
+              // Guardar
+              IconButton(
+                icon: const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 28,
+                ),
+                onPressed: _save,
+              ),
+            ],
+          ],
+        ],
+        /*actions: [
           // Solo mostrar botón guardar si NO es readOnly
           if (!readOnly)
             if (_saving)
@@ -734,7 +790,7 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
                 padding: EdgeInsets.zero,
               ),
             ),
-        ],
+        ],*/
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -771,7 +827,8 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
               style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             ),
             const SizedBox(height: 8),
-            readOnly
+
+            (readOnly && !_isEditing)
                 ? Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
@@ -793,6 +850,28 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+            /*readOnly
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      act['descripcion'] ?? 'Sin descripción',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  )
+                : TextField(
+                    controller: _descController,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'Describe el avance de esta actividad...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),*/
             const SizedBox(height: 20),
 
             // ── Observaciones ─────────────────────────────
@@ -801,7 +880,7 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
               style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             ),
             const SizedBox(height: 8),
-            readOnly
+            (readOnly && !_isEditing)
                 ? Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
@@ -823,6 +902,28 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+            /*readOnly
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      act['observaciones'] ?? 'Sin observaciones',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  )
+                : TextField(
+                    controller: _obsController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      hintText: 'Ej: Actividad completada exitosamente...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),*/
             const SizedBox(height: 20),
 
             // ── Evidencia fotográfica ────────────────────
@@ -833,7 +934,7 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
             const SizedBox(height: 8),
 
             // Mostrar foto existente si tiene
-            if (readOnly) ...[
+            if (readOnly && !_isEditing) ...[
               if (act['urlEvidencia'] != null &&
                   act['urlEvidencia'].toString().isNotEmpty)
                 // Mostrar por URL

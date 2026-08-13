@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:app_tesis/screens/main_home.dart';
 import 'package:app_tesis/screens/splash_screen/splash_screen.dart';
 
-
 void main() {
   runApp(const MyApp());
 }
@@ -20,19 +19,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: Color.fromARGB(255, 7, 83, 11),
+        ),
+      ),
       //providers: [ChangeNotifierProvider(create: (_) => WeatherProvider())],
       //child: const MaterialApp(
-        /*localizationsDelegates: [
+      /*localizationsDelegates: [
           AppLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
         ],*/
-        debugShowCheckedModeBanner: false,
-        title: 'Hola mundo',
-        home: SplashScreen(),
-     // ),
-   );
+      debugShowCheckedModeBanner: false,
+      title: 'Hola mundo',
+      home: SplashScreen(),
+      // ),
+    );
   }
 }
 
@@ -43,8 +47,11 @@ class WeatherTime extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Menu Principal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),),
-        backgroundColor: Colors.purple,
+        title: const Text(
+          'Menu Principal',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: const Color.fromARGB(255, 7, 83, 11),
       ),
       body: MainHome(),
     );

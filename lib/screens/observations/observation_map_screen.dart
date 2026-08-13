@@ -122,7 +122,7 @@ class _ObservationMapScreenState extends State<ObservationMapScreen> {
                             ),
                           ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
+                    backgroundColor: const Color.fromARGB(255, 7, 83, 11),
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: Colors.grey.shade400,
                     minimumSize: const Size(double.infinity, 48),

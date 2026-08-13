@@ -270,7 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[800],
+              backgroundColor: Color.fromARGB(255, 7, 83, 11),
               foregroundColor: Colors.white,
             ),
             child: const Text('Guardar'),
@@ -347,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.green),
+              leading: const Icon(Icons.camera_alt, color: Color.fromARGB(255, 7, 83, 11)),
               title: const Text('Cámara'),
               onTap: () => Navigator.pop(ctx, 'camera'),
             ),
@@ -449,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Perfil actualizado"),
-            backgroundColor: Colors.green,
+            backgroundColor: Color.fromARGB(255, 7, 83, 11),
           ),
         );
       } else {

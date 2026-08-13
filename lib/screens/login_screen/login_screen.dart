@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: _login,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green[800],
+                              backgroundColor: const Color.fromARGB(255, 7, 83, 11),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),
@@ -397,14 +397,14 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 14),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: const Color.fromARGB(255, 7, 83, 11),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade200),
+                        border: Border.all(color: const Color.fromARGB(255, 7, 83, 11)),
                       ),
                       child: Row(
                         children: [
                           Icon(Icons.check_circle,
-                              color: Colors.green.shade600, size: 32),
+                              color: Color.fromARGB(255, 7, 83, 11), size: 32),
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
@@ -424,7 +424,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[800],
+                          backgroundColor: const Color.fromARGB(255, 7, 83, 11),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
@@ -446,7 +446,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                             child: ElevatedButton(
                               onPressed: _recover,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[800],
+                                backgroundColor: const Color.fromARGB(255, 7, 83, 11),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30),
                                 ),
@@ -716,7 +716,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       barrierDismissible: false,
       builder: (ctx) => _PermissionDialog(
         icon: Icons.location_on,
-        iconColor: Colors.green.shade700,
+        iconColor: Color.fromARGB(255, 7, 83, 11),
         appName: 'GoblinPark',
         message: 'acceda a la ubicación de este dispositivo?',
         onReject: () {
@@ -730,7 +730,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             barrierDismissible: false,
             builder: (ctx2) => _PermissionDialog(
               icon: Icons.camera_alt,
-              iconColor: Colors.green.shade700,
+              iconColor: const Color.fromARGB(255, 7, 83, 11),
               appName: 'GoblinPark',
               message: 'tome fotos?',
               onReject: () {
@@ -905,14 +905,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: ElevatedButton(
                             onPressed: _register,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green[800],
+                              backgroundColor: const Color.fromARGB(255, 7, 83, 11),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),
                             ),
                             child: const Text("SIGN UP",
                                 style: TextStyle(
-                                    fontSize: 16, color: Colors.white)),
+                                    fontSize: 16, color: Color.fromARGB(255, 7, 83, 11))),
                           ),
                         ),
                   const SizedBox(height: 20),
@@ -925,7 +925,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onTap: () => Navigator.pop(context),
                         child: const Text("Login",
                             style: TextStyle(
-                                color: Colors.blue,
+                                color: Color.fromARGB(255, 7, 83, 11),
                                 fontWeight: FontWeight.bold)),
                       ),
                     ],
@@ -998,7 +998,7 @@ class _PermissionDialog extends StatelessWidget {
         ElevatedButton(
           onPressed: onAllow,
           style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[800],
+              backgroundColor: const Color.fromARGB(255, 7, 83, 11),
               foregroundColor: Colors.white),
           child: const Text('Permitir'),
         ),

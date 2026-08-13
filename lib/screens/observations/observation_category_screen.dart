@@ -108,6 +108,66 @@ class _ObservationCategoryScreenState extends State<ObservationCategoryScreen> {
             Container(color: Colors.black.withValues(alpha: 0.45)),
             // ── Grid de categorías ───────────────────────────
             Padding(
+              padding: const EdgeInsets.fromLTRB(24, 230, 24, 24),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 16,
+                runSpacing: 16,
+                children: _categories.map((cat) {
+                  final isSelected = _selected == cat['label'];
+
+                  return SizedBox(
+                    width: (MediaQuery.of(context).size.width - 48 - 32) / 3,
+                    height:
+                        ((MediaQuery.of(context).size.width - 48 - 32) / 3) /
+                        0.9,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selected = cat['label']),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (cat['color'] as Color).withValues(alpha: 0.3)
+                              : Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected
+                                ? cat['color'] as Color
+                                : Colors.white.withValues(alpha: 0.4),
+                            width: 2.5,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.asset(
+                                cat['image'] as String,
+                                width: 56,
+                                height: 56,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              cat['label'] as String,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? cat['color'] as Color
+                                    : Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            /*Padding(
               padding: const EdgeInsets.fromLTRB(24, 100, 24, 24),
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -164,7 +224,7 @@ class _ObservationCategoryScreenState extends State<ObservationCategoryScreen> {
                   );
                 },
               ),
-            ),
+            ),*/
           ],
         ),
       ),

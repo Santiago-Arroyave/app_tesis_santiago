@@ -64,7 +64,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     if (n.contains('alta') || n.contains('crítica') || n.contains('critica')) {
       return Colors.red.shade600;
     } else if (n.contains('baja')) {
-      return Colors.green.shade600;
+      return const Color.fromARGB(255, 7, 83, 11);
     }
     return Colors.orange.shade600;
   }
@@ -248,6 +248,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
 
       request.fields['fuente'] = 'mobile';
 
+      /*
       //==============================
       // Imágenes
       //==============================
@@ -255,7 +256,35 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
         request.files.add(
           await http.MultipartFile.fromPath('evidencias', _photos[i].path),
         );
-      }
+      }*/
+
+      //==============================
+// Imágenes
+//==============================
+for (int i = 0; i < _photos.length; i++) {
+  final file = _photos[i];
+
+  final extension = file.path.split('.').last.toLowerCase();
+
+  String mimeType = 'image/jpeg';
+
+  if (extension == 'png') {
+    mimeType = 'image/png';
+  } else if (extension == 'webp') {
+    mimeType = 'image/webp';
+  } else if (extension == 'jpg' || extension == 'jpeg') {
+    mimeType = 'image/jpeg';
+  }
+
+  request.files.add(
+    await http.MultipartFile.fromPath(
+      'evidencias',
+      file.path,
+      filename: file.path.split('/').last,
+      contentType: MediaType.parse(mimeType),
+    ),
+  );
+}
 
       final streamedResponse = await request.send();
 
@@ -274,7 +303,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Observación guardada exitosamente'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color.fromARGB(255, 7, 83, 11),
           ),
         );
 
@@ -557,7 +586,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
               IconButton(
                 icon: const Icon(
                   Icons.check_circle,
-                  color: Colors.green,
+                  color: const Color.fromARGB(255, 7, 83, 11),
                   size: 28,
                 ),
                 onPressed: _saveObservation,
@@ -673,7 +702,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isSelected
-                                  ? Colors.green.shade600
+                                  ? const Color.fromARGB(255, 7, 83, 11)
                                   : Colors.grey.shade300,
                               width: isSelected ? 2 : 1,
                             ),
@@ -701,7 +730,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                                       ? FontWeight.bold
                                       : FontWeight.normal,
                                   color: isSelected
-                                      ? Colors.green.shade700
+                                      ? const Color.fromARGB(255, 7, 83, 11)
                                       : Colors.black87,
                                 ),
                               ),
@@ -709,7 +738,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                               if (isSelected)
                                 Icon(
                                   Icons.check_circle,
-                                  color: Colors.green.shade600,
+                                  color: const Color.fromARGB(255, 7, 83, 11),
                                   size: 20,
                                 ),
                             ],
@@ -892,7 +921,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.shade600,
+                                    color: const Color.fromARGB(255, 7, 83, 11),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text(
