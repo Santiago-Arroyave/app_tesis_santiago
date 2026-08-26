@@ -6,6 +6,7 @@ import 'package:app_tesis/screens/projects/schedule_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'dart:io';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   final int projectId;
@@ -16,7 +17,7 @@ class ProjectDetailScreen extends StatefulWidget {
 }
 
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
   Map<String, dynamic>? _data;
   bool _isLoading = true;
   String? _error;

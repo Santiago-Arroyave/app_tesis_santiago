@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
 import 'project_detail_screen.dart';
 import 'package:app_tesis/screens/profile/notification_service.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class ProjectScreen extends StatefulWidget {
   const ProjectScreen({super.key});
@@ -14,7 +15,7 @@ class ProjectScreen extends StatefulWidget {
 
 class _ProjectScreenState extends State<ProjectScreen>
     with SingleTickerProviderStateMixin {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 

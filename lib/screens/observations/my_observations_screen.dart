@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
 import 'observation_detail_screen.dart';
 import 'observation_edit_screen.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class MyObservationsScreen extends StatefulWidget {
   const MyObservationsScreen({super.key});
@@ -14,7 +15,7 @@ class MyObservationsScreen extends StatefulWidget {
 }
 
 class _MyObservationsScreenState extends State<MyObservationsScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   List<dynamic> _observations = [];
   bool _isLoading = true;
@@ -151,6 +152,66 @@ class _MyObservationsScreenState extends State<MyObservationsScreen> {
   }
 
   String _timeAgo(String? fechaStr) {
+    if (fechaStr == null || fechaStr.trim().isEmpty) {
+      return '';
+    }
+
+    try {
+      DateTime fecha = DateTime.parse(fechaStr);
+
+      // Si la fecha viene sin información de zona horaria,
+      // la interpretamos como hora local.
+      if (!fechaStr.contains('Z') &&
+          !fechaStr.contains('+') &&
+          !RegExp(r'-\d{2}:\d{2}$').hasMatch(fechaStr)) {
+        fecha = DateTime(
+          fecha.year,
+          fecha.month,
+          fecha.day,
+          fecha.hour,
+          fecha.minute,
+          fecha.second,
+          fecha.millisecond,
+          fecha.microsecond,
+        );
+      }
+
+      final ahora = DateTime.now();
+      final diff = ahora.difference(fecha);
+
+      if (diff.isNegative) {
+        return 'Hace unos momentos';
+      }
+
+      if (diff.inSeconds < 60) {
+        return 'Hace unos segundos';
+      }
+
+      if (diff.inMinutes < 60) {
+        final minutos = diff.inMinutes;
+        return minutos == 1 ? 'Hace 1 minuto' : 'Hace $minutos minutos';
+      }
+
+      if (diff.inHours < 24) {
+        final horas = diff.inHours;
+        return horas == 1 ? 'Hace 1 hora' : 'Hace $horas horas';
+      }
+
+      if (diff.inDays < 30) {
+        final dias = diff.inDays;
+        return dias == 1 ? 'Hace 1 día' : 'Hace $dias días';
+      }
+
+      return '${fecha.day.toString().padLeft(2, '0')}/'
+          '${fecha.month.toString().padLeft(2, '0')}/'
+          '${fecha.year}';
+    } catch (e) {
+      debugPrint('Error procesando fecha: $fechaStr -> $e');
+      return fechaStr.length >= 10 ? fechaStr.substring(0, 10) : fechaStr;
+    }
+  }
+
+  /*String _timeAgo(String? fechaStr) {
     if (fechaStr == null) return '';
     try {
       final fecha = DateTime.parse(fechaStr);
@@ -161,7 +222,7 @@ class _MyObservationsScreenState extends State<MyObservationsScreen> {
     } catch (_) {
       return fechaStr.substring(0, 10);
     }
-  }
+  }*/
 
   Future<void> _deleteObservation(int id) async {
     final confirmed = await showDialog<bool>(
@@ -327,7 +388,7 @@ class _MyObservationsScreenState extends State<MyObservationsScreen> {
                           categoria: categoria,
                           imageAsset: _categoryImage(categoria),
                           timeAgo: _timeAgo(
-                            obs['fechaEvento'] ?? obs['createdAt'],
+                            obs['createdAt'] ?? obs['fechaEvento'],
                           ),
                           onTap: () => Navigator.push(
                             context,

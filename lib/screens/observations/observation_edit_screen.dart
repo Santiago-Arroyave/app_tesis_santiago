@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class ObservationEditScreen extends StatefulWidget {
   final Map<String, dynamic> obs;
@@ -15,7 +16,7 @@ class ObservationEditScreen extends StatefulWidget {
 }
 
 class _ObservationEditScreenState extends State<ObservationEditScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   late TextEditingController _tituloController;
   late TextEditingController _descController;

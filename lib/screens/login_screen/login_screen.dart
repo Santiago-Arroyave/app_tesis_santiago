@@ -10,6 +10,8 @@ import 'package:app_tesis/screens/main_map/main_screen.dart';
 import 'auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -63,12 +65,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const SizedBox(height: 40),
                   Center(
-                    child: Image.asset('assets/images/Logo verde.png',
-                        width: 110),
+                    child: Image.asset(
+                      'assets/images/Logo verde.png',
+                      width: 110,
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  const Text("Iniciar sesión",
-                      style: TextStyle(fontSize: 18)),
+                  const Text("Iniciar sesión", style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 30),
 
                   // ── Correo ────────────────────────────────────
@@ -81,7 +84,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -105,7 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -120,28 +127,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 14),
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 8,
-                              offset: Offset(0, 2))
+                            color: Colors.black12,
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_rounded,
-                              color: Colors.red.shade600, size: 32),
+                          Icon(
+                            Icons.error_rounded,
+                            color: Colors.red.shade600,
+                            size: 32,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               _errorMessage!,
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ],
@@ -158,11 +172,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) =>
-                                const RecoverPasswordScreen()),
+                          builder: (_) => const RecoverPasswordScreen(),
+                        ),
                       ),
-                      child: const Text("Recuperar contraseña?",
-                          style: TextStyle(color: Colors.black54)),
+                      child: const Text(
+                        "Recuperar contraseña?",
+                        style: TextStyle(color: Colors.black54),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -176,14 +192,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: _login,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromARGB(255, 7, 83, 11),
+                              backgroundColor: const Color.fromARGB(
+                                255,
+                                7,
+                                83,
+                                11,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),
                             ),
-                            child: const Text("LOGIN",
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.white)),
+                            child: const Text(
+                              "LOGIN",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                   const SizedBox(height: 20),
@@ -196,18 +221,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const RegisterScreen()),
+                            builder: (_) => const RegisterScreen(),
+                          ),
                         ),
-                        child: const Text("Sign Up",
-                            style: TextStyle(
-                                color: Colors.blue,
-                                fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          "Sign Up",
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 30),
-                  Image.asset('assets/images/plantas.png',
-                      width: double.infinity, fit: BoxFit.cover),
+                  Image.asset(
+                    'assets/images/plantas.png',
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ],
               ),
             ),
@@ -224,8 +256,7 @@ class RecoverPasswordScreen extends StatefulWidget {
   const RecoverPasswordScreen({super.key});
 
   @override
-  State<RecoverPasswordScreen> createState() =>
-      _RecoverPasswordScreenState();
+  State<RecoverPasswordScreen> createState() => _RecoverPasswordScreenState();
 }
 
 class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
@@ -244,7 +275,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:8080/api/auth/recover-password'),
+        Uri.parse('${ApiConfig.baseUrl}/api/auth/recover-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'identifier': _identifierController.text.trim(),
@@ -260,8 +291,10 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
         setState(() => _success = true);
       } else {
         final data = jsonDecode(response.body);
-        setState(() =>
-            _errorMessage = data['message'] ?? 'Error al recuperar contraseña');
+        setState(
+          () => _errorMessage =
+              data['message'] ?? 'Error al recuperar contraseña',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -287,12 +320,16 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                 children: [
                   const SizedBox(height: 40),
                   Center(
-                    child: Image.asset('assets/images/Logo verde.png',
-                        width: 110),
+                    child: Image.asset(
+                      'assets/images/Logo verde.png',
+                      width: 110,
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  const Text("Recuperar contraseña",
-                      style: TextStyle(fontSize: 18)),
+                  const Text(
+                    "Recuperar contraseña",
+                    style: TextStyle(fontSize: 18),
+                  ),
                   const SizedBox(height: 30),
 
                   // ── Correo o identificador ────────────────
@@ -304,14 +341,15 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    validator: (v) =>
-                        v!.isEmpty ? "Ingrese su correo" : null,
+                    validator: (v) => v!.isEmpty ? "Ingrese su correo" : null,
                   ),
                   const SizedBox(height: 15),
 
@@ -324,7 +362,9 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -344,7 +384,9 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -363,27 +405,36 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 14),
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 8,
-                              offset: Offset(0, 2))
+                            color: Colors.black12,
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_rounded,
-                              color: Colors.red.shade600, size: 32),
+                          Icon(
+                            Icons.error_rounded,
+                            color: Colors.red.shade600,
+                            size: 32,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(_errorMessage!,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -395,23 +446,31 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 14),
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color.fromARGB(255, 7, 83, 11),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color.fromARGB(255, 7, 83, 11)),
+                        border: Border.all(
+                          color: const Color.fromARGB(255, 7, 83, 11),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.check_circle,
-                              color: Color.fromARGB(255, 7, 83, 11), size: 32),
+                          Icon(
+                            Icons.check_circle,
+                            color: Color.fromARGB(255, 7, 83, 11),
+                            size: 32,
+                          ),
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
                               'Contraseña actualizada exitosamente',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ],
@@ -429,9 +488,10 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                             borderRadius: BorderRadius.circular(30),
                           ),
                         ),
-                        child: const Text('Volver al login',
-                            style: TextStyle(
-                                fontSize: 16, color: Colors.white)),
+                        child: const Text(
+                          'Volver al login',
+                          style: TextStyle(fontSize: 16, color: Colors.white),
+                        ),
                       ),
                     ),
                   ],
@@ -446,15 +506,23 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                             child: ElevatedButton(
                               onPressed: _recover,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color.fromARGB(255, 7, 83, 11),
+                                backgroundColor: const Color.fromARGB(
+                                  255,
+                                  7,
+                                  83,
+                                  11,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                               ),
-                              child: const Text("RECUPERAR",
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.white)),
+                              child: const Text(
+                                "RECUPERAR",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
                     const SizedBox(height: 20),
@@ -464,18 +532,24 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                         const Text("¿Ya tienes una cuenta? "),
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
-                          child: const Text("Login",
-                              style: TextStyle(
-                                  color: Colors.blue,
-                                  fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            "Login",
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ],
 
                   const SizedBox(height: 30),
-                  Image.asset('assets/images/plantas.png',
-                      width: double.infinity, fit: BoxFit.cover),
+                  Image.asset(
+                    'assets/images/plantas.png',
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ],
               ),
             ),
@@ -710,7 +784,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _requestPermissions() {
+  Future<void> _requestLocationPermission() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      _goToMain();
+      return;
+    }
+
+    // Ubicación concedida
+    _requestCameraPermission();
+  }
+
+  /*void _requestPermissions() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -746,6 +844,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
         },
       ),
     );
+  }*/
+
+  void _requestPermissions() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _PermissionDialog(
+        icon: Icons.location_on,
+        iconColor: const Color.fromARGB(255, 7, 83, 11),
+        appName: 'GoblinPark',
+        message: 'acceda a la ubicación de este dispositivo?',
+        onReject: () {
+          Navigator.pop(ctx);
+          _goToMain();
+        },
+        onAllow: () async {
+          Navigator.pop(ctx);
+
+          await _requestLocationPermission();
+        },
+      ),
+    );
+  }
+
+  void _requestCameraPermission() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _PermissionDialog(
+        icon: Icons.camera_alt,
+        iconColor: const Color.fromARGB(255, 7, 83, 11),
+        appName: 'GoblinPark',
+        message: 'tome fotos?',
+        onReject: () {
+          Navigator.pop(ctx);
+          _goToMain();
+        },
+        onAllow: () {
+          Navigator.pop(ctx);
+          _goToMain();
+        },
+      ),
+    );
   }
 
   void _goToMain() {
@@ -770,12 +911,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   const SizedBox(height: 40),
                   Center(
-                    child: Image.asset('assets/images/Logo verde.png',
-                        width: 110),
+                    child: Image.asset(
+                      'assets/images/Logo verde.png',
+                      width: 110,
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  const Text("Registrarse",
-                      style: TextStyle(fontSize: 18)),
+                  const Text("Registrarse", style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 30),
 
                   // ── Nombres ───────────────────────────────────
@@ -786,14 +928,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    validator: (v) =>
-                        v!.isEmpty ? "Ingrese su nombre" : null,
+                    validator: (v) => v!.isEmpty ? "Ingrese su nombre" : null,
                   ),
                   const SizedBox(height: 15),
 
@@ -806,7 +949,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -829,7 +974,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -849,7 +996,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       filled: true,
                       fillColor: Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 15),
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -868,27 +1017,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 14),
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 8,
-                              offset: Offset(0, 2))
+                            color: Colors.black12,
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_rounded,
-                              color: Colors.red.shade600, size: 32),
+                          Icon(
+                            Icons.error_rounded,
+                            color: Colors.red.shade600,
+                            size: 32,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(_errorMessage!,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -905,14 +1063,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: ElevatedButton(
                             onPressed: _register,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromARGB(255, 7, 83, 11),
+                              backgroundColor: const Color.fromARGB(
+                                255,
+                                7,
+                                83,
+                                11,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),
                             ),
-                            child: const Text("SIGN UP",
-                                style: TextStyle(
-                                    fontSize: 16, color: Color.fromARGB(255, 7, 83, 11))),
+                            child: const Text(
+                              "SIGN UP",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                   const SizedBox(height: 20),
@@ -923,16 +1090,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const Text("¿Ya tienes una cuenta? "),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
-                        child: const Text("Login",
-                            style: TextStyle(
-                                color: Color.fromARGB(255, 7, 83, 11),
-                                fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          "Login",
+                          style: TextStyle(
+                            color: Color.fromARGB(255, 7, 83, 11),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 30),
-                  Image.asset('assets/images/plantas.png',
-                      width: double.infinity, fit: BoxFit.cover),
+                  Image.asset(
+                    'assets/images/plantas.png',
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ],
               ),
             ),
@@ -965,8 +1138,7 @@ class _PermissionDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -975,8 +1147,7 @@ class _PermissionDialog extends StatelessWidget {
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
-              style:
-                  const TextStyle(color: Colors.black, fontSize: 14),
+              style: const TextStyle(color: Colors.black, fontSize: 14),
               children: [
                 const TextSpan(text: '¿Permitir que '),
                 TextSpan(
@@ -992,14 +1163,17 @@ class _PermissionDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: onReject,
-          child: const Text('Rechazar',
-              style: TextStyle(color: Colors.black54)),
+          child: const Text(
+            'Rechazar',
+            style: TextStyle(color: Colors.black54),
+          ),
         ),
         ElevatedButton(
           onPressed: onAllow,
           style: ElevatedButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 7, 83, 11),
-              foregroundColor: Colors.white),
+            backgroundColor: const Color.fromARGB(255, 7, 83, 11),
+            foregroundColor: Colors.white,
+          ),
           child: const Text('Permitir'),
         ),
       ],

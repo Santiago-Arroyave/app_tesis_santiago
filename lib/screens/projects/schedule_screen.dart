@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class ScheduleScreen extends StatefulWidget {
   final List<dynamic> actividades;
@@ -23,7 +24,7 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   /*void _openActivity(Map<String, dynamic> actividad) {
     Navigator.push(
@@ -232,7 +233,7 @@ class _ActivityDetailScreen extends StatefulWidget {
 }
 
 class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   final _obsController = TextEditingController();
   final _descController = TextEditingController();

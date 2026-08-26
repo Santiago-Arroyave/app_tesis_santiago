@@ -5,6 +5,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
 import 'dart:typed_data';
+import 'package:geolocator/geolocator.dart';
+import 'dart:async';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -14,16 +17,28 @@ class HomeMapScreen extends StatefulWidget {
 }
 
 class _HomeMapScreenState extends State<HomeMapScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
-  static const _initialCenter = LatLng(4.0847, -76.1954);
+  static const _baseUrl =
+      '${ApiConfig.baseUrl}'; // URL de producción
+  //static const _initialCenter = LatLng(4.0847, -76.1954);
+  // Ubicación inicial de respaldo
+  static const _defaultCenter = LatLng(4.0847, -76.1954);
 
   List<dynamic> _reportes = [];
   bool _isLoading = true;
 
+  LatLng? _currentLocation;
+
+  StreamSubscription<Position>? _positionSubscription;
+
+  final MapController _mapController = MapController();
+
   @override
   void initState() {
     super.initState();
+
     _loadReportes();
+    _getCurrentLocation();
+    _startLocationTracking();
   }
 
   Future<void> _loadReportes() async {
@@ -65,6 +80,79 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceEnabled) {
+        debugPrint('El servicio de ubicación está desactivado');
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        debugPrint('Permiso de ubicación no concedido');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (!mounted) return;
+
+      final location = LatLng(position.latitude, position.longitude);
+
+      setState(() {
+        _currentLocation = location;
+      });
+
+      // Centrar el mapa en la ubicación real
+      _mapController.move(location, 15);
+
+      debugPrint(
+        'Ubicación actual: '
+        '${position.latitude}, ${position.longitude}',
+      );
+    } catch (e) {
+      debugPrint('Error obteniendo ubicación: $e');
+    }
+  }
+
+  void _startLocationTracking() {
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10,
+    );
+
+    _positionSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            if (!mounted) return;
+
+            final location = LatLng(position.latitude, position.longitude);
+
+            setState(() {
+              _currentLocation = location;
+            });
+
+            _mapController.move(location, 15);
+          },
+        );
+  }
+
+  @override
+  void dispose() {
+    _positionSubscription?.cancel();
+    super.dispose();
   }
 
   Color _priorityColor(String? prioridad) {
@@ -311,7 +399,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                       const SizedBox(height: 4),
 
                       Text(
-                        'Fecha: ${reporte['fechaEvento'] != null ? reporte['fechaEvento'].toString().substring(0, 10) : ''}',
+                        'Fecha: ${reporte['created_At'] != null ? reporte['created_At'].toString().substring(0, 10) : ''}',
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade600,
@@ -449,13 +537,93 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     return Stack(
       children: [
         FlutterMap(
-          options: MapOptions(initialCenter: _initialCenter, initialZoom: 14),
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _currentLocation ?? _defaultCenter,
+            initialZoom: 14,
+          ),
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.example.app_tesis',
             ),
             MarkerLayer(
+              markers: [
+                // =========================================================
+                // MARCADORES DE LOS REPORTES
+                // =========================================================
+                ..._reportes.map((r) {
+                  final color = _priorityColor(r['prioridadNombre']);
+
+                  return Marker(
+                    point: LatLng(
+                      (r['latitud'] as num).toDouble(),
+                      (r['longitud'] as num).toDouble(),
+                    ),
+                    width: 44,
+                    height: 44,
+                    child: GestureDetector(
+                      onTap: () =>
+                          _showObservationDetail(Map<String, dynamic>.from(r)),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+
+                // =========================================================
+                // MARCADOR DE LA UBICACIÓN ACTUAL DEL USUARIO
+                // =========================================================
+                if (_currentLocation != null)
+                  Marker(
+                    point: _currentLocation!,
+                    width: 50,
+                    height: 50,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blue.withValues(alpha: 0.20),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.blue,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            /*MarkerLayer(
               markers: _reportes.map((r) {
                 final color = _priorityColor(r['prioridadNombre']);
                 return Marker(
@@ -490,7 +658,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                   ),
                 );
               }).toList(),
-            ),
+            ),*/
           ],
         ),
 
@@ -540,12 +708,48 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
         Positioned(
           bottom: 24,
           right: 16,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Botón para ir a mi ubicación
+              FloatingActionButton.small(
+                heroTag: 'locationButton',
+                onPressed: () {
+                  if (_currentLocation != null) {
+                    _mapController.move(_currentLocation!, 17);
+                  } else {
+                    _getCurrentLocation();
+                  }
+                },
+                backgroundColor: Colors.white,
+                child: const Icon(Icons.my_location, color: Colors.blue),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Botón actualizar reportes
+              FloatingActionButton.small(
+                heroTag: 'refreshButton',
+                onPressed: _loadReportes,
+                backgroundColor: Colors.white,
+                child: const Icon(
+                  Icons.refresh,
+                  color: Color.fromARGB(255, 7, 83, 11),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        /*Positioned(
+          bottom: 24,
+          right: 16,
           child: FloatingActionButton.small(
             onPressed: _loadReportes,
             backgroundColor: Colors.white,
             child: Icon(Icons.refresh, color: Color.fromARGB(255, 7, 83, 11)),
           ),
-        ),
+        ),*/
       ],
     );
   }

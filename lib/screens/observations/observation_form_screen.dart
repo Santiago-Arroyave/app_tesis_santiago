@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class ObservationFormScreen extends StatefulWidget {
   final LatLng location;
@@ -23,7 +24,7 @@ class ObservationFormScreen extends StatefulWidget {
 }
 
 class _ObservationFormScreenState extends State<ObservationFormScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   final _typeController = TextEditingController();
   final _descController = TextEditingController();

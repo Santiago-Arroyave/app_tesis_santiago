@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
 import 'notification_service.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -12,7 +13,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   List<Map<String, dynamic>> _solicitudes = [];
   bool _isLoading = true;

@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:app_tesis/screens/login_screen/auth_service.dart';
 //import 'package:app_tesis/screens/login_screen/login_screen.dart';
+import 'package:app_tesis/screens/api_connection/api_config.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,7 +20,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   Map<String, dynamic>? _usuario;
   bool _isLoading = true;
