@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 //import 'package:recipe_book/screens/recipe_detail.dart';
 //import 'package:recipe_book/models/recipe_model.dart';
 //import 'package:recipe_book/l10n/app_localizations.dart';
-import 'package:app_tesis/providers/weather_provider.dart';
-import 'package:app_tesis/models/weather_model.dart';
-import 'package:app_tesis/screens/weather_details.dart';
-import 'package:app_tesis/l10n/app_localizations.dart';
+import 'package:goblink_park/providers/weather_provider.dart';
+import 'package:goblink_park/models/weather_model.dart';
+import 'package:goblink_park/screens/weather_details.dart';
+import 'package:goblink_park/l10n/app_localizations.dart';
 
 class WeatherObservations extends StatelessWidget {
   const WeatherObservations({super.key});

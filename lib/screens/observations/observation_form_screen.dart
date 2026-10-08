@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:app_tesis/screens/observations/observation_discard_dialog.dart';
+import 'package:goblink_park/screens/observations/observation_discard_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:app_tesis/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class ObservationFormScreen extends StatefulWidget {
   final LatLng location;
@@ -202,7 +202,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   Future<void> _saveObservation() async {
     if (_typeController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa el tipo de animal/especie')),
+        const SnackBar(content: Text('Ingresa el titulo de la observación')),
       );
       return;
     }
@@ -658,7 +658,7 @@ for (int i = 0; i < _photos.length; i++) {
                     TextField(
                       controller: _typeController,
                       decoration: const InputDecoration(
-                        labelText: 'Tipo de animal / especie',
+                        labelText: 'Título de la observación',
                         hintText: 'Ej: Puma andino',
                         border: OutlineInputBorder(),
                       ),

@@ -6,12 +6,12 @@
 //import '../main.dart'; // o tu pantalla principal
 
 import 'package:flutter/material.dart';
-import 'package:app_tesis/screens/main_map/main_screen.dart';
+import 'package:goblink_park/screens/main_map/main_screen.dart';
 import 'auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'observation_form_screen.dart';
-import 'package:app_tesis/screens/observations/observation_discard_dialog.dart';
+import 'package:goblink_park/screens/observations/observation_discard_dialog.dart';
 
 class ObservationCategoryScreen extends StatefulWidget {
   final LatLng location;

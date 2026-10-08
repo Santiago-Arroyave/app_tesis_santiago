@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:app_tesis/screens/report_map/result_report.dart';
+import 'package:goblink_park/screens/report_map/result_report.dart';
 
 
 class FilterCategoryScreen extends StatelessWidget {

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:app_tesis/screens/report_map/report_map_service.dart';
-//mport 'package:app_tesis/screens/observations/observations_screen.dart';
-import 'package:app_tesis/screens/projects/project_screen.dart';
-import 'package:app_tesis/screens/profile/profile_screen.dart';
-import 'package:app_tesis/screens/observations/my_observations_screen.dart';
+import 'package:goblink_park/screens/report_map/report_map_service.dart';
+//mport 'package:goblink_park/screens/observations/observations_screen.dart';
+import 'package:goblink_park/screens/projects/project_screen.dart';
+import 'package:goblink_park/screens/profile/profile_screen.dart';
+import 'package:goblink_park/screens/observations/my_observations_screen.dart';
 
 class MainHome extends StatelessWidget {
   const MainHome({super.key});

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:app_tesis/screens/report_map/view_report.dart';
+import 'package:goblink_park/screens/report_map/view_report.dart';
 
 class ReportMapsScreen extends StatelessWidget {
   const ReportMapsScreen({super.key});

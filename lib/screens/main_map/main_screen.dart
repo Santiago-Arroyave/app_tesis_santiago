@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:app_tesis/screens/main_map/home_map_screen.dart';
-//import 'package:app_tesis/screens/observations/observations_screen.dart';
-import 'package:app_tesis/screens/projects/project_screen.dart';
-import 'package:app_tesis/screens/profile/profile_screen.dart';
-//import 'package:app_tesis/screens/report_map/report_maps.dart';
-//import 'package:app_tesis/screens/report_map/report_map_service.dart';
-import 'package:app_tesis/screens/observations/my_observations_screen.dart';
-import 'package:app_tesis/screens/observations/observation_map_screen.dart';
+import 'package:goblink_park/screens/main_map/home_map_screen.dart';
+//import 'package:goblink_park/screens/observations/observations_screen.dart';
+import 'package:goblink_park/screens/projects/project_screen.dart';
+import 'package:goblink_park/screens/profile/profile_screen.dart';
+//import 'package:goblink_park/screens/report_map/report_maps.dart';
+//import 'package:goblink_park/screens/report_map/report_map_service.dart';
+import 'package:goblink_park/screens/observations/my_observations_screen.dart';
+import 'package:goblink_park/screens/observations/observation_map_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});

@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 //import 'package:provider/provider.dart';
 //import 'package:flutter_localizations/flutter_localizations.dart';
 //import 'package:app_tesis/l10n/app_localizations.dart';
-import 'package:app_tesis/screens/main_home.dart';
-import 'package:app_tesis/screens/splash_screen/splash_screen.dart';
+import 'package:goblink_park/screens/main_home.dart';
+import 'package:goblink_park/screens/splash_screen/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -33,7 +33,7 @@ class MyApp extends StatelessWidget {
           GlobalMaterialLocalizations.delegate,
         ],*/
       debugShowCheckedModeBanner: false,
-      title: 'Hola mundo',
+      title: 'GoblinPark App',
       home: SplashScreen(),
       // ),
     );

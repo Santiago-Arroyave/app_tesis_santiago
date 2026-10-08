@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
-import 'package:app_tesis/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'dart:typed_data';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -399,7 +399,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                       const SizedBox(height: 4),
 
                       Text(
-                        'Fecha: ${reporte['created_At'] != null ? reporte['created_At'].toString().substring(0, 10) : ''}',
+                        'Fecha: ${reporte['fechaReporte'] != null ? reporte['fechaReporte'].toString().substring(0, 10) : ''}',
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade600,

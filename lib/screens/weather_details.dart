@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 //import 'package:recipe_book/models/recipe_model.dart';
 //import 'package:recipe_book/providers/recipes_provider.dart';
-import 'package:app_tesis/providers/weather_provider.dart';
-import 'package:app_tesis/models/weather_model.dart';
+import 'package:goblink_park/providers/weather_provider.dart';
+import 'package:goblink_park/models/weather_model.dart';
 import 'package:provider/provider.dart';
 
 class WeatherDetails extends StatefulWidget {

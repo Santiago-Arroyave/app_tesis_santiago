@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:app_tesis/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'project_detail_screen.dart';
-import 'package:app_tesis/screens/profile/notification_service.dart';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/profile/notification_service.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class ProjectScreen extends StatefulWidget {
   const ProjectScreen({super.key});
@@ -66,6 +66,121 @@ class _ProjectScreenState extends State<ProjectScreen>
       _isLoadingAll = true;
       _errorAll = null;
     });
+
+    try {
+      final id = await AuthService.getUserId();
+
+      // =====================================================
+      // 1. OBTENER LAS MEMBRESÍAS DEL USUARIO
+      // =====================================================
+      final membResponse = await http.get(
+        Uri.parse('$_baseUrl/api/proyecto-miembros/usuario/$id'),
+        headers: await _headers(),
+      );
+
+      if (!mounted) return;
+
+      if (membResponse.statusCode != 200) {
+        setState(() {
+          _errorAll = 'Error ${membResponse.statusCode}';
+          _isLoadingAll = false;
+        });
+        return;
+      }
+
+      final membBody = jsonDecode(membResponse.body);
+
+      List<dynamic> miembros;
+
+      if (membBody is List) {
+        miembros = membBody;
+      } else if (membBody is Map && membBody.containsKey('content')) {
+        miembros = membBody['content'] as List;
+      } else {
+        miembros = [];
+      }
+
+      // =====================================================
+      // 2. OBTENER SOLO LOS IDs DE PROYECTOS ACEPTADOS
+      // =====================================================
+      //
+      // estado == true significa que el usuario pertenece
+      // actualmente al proyecto.
+      //
+      // Los rechazados NO entran aquí, por lo tanto
+      // seguirán apareciendo en "Proyectos".
+      //
+      final idsProyectosAceptados = miembros
+          .where((m) => m['estado'] == true)
+          .map((m) => m['proyectoId'])
+          .where((id) => id != null)
+          .toSet();
+
+      // =====================================================
+      // 3. CARGAR TODOS LOS PROYECTOS
+      // =====================================================
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/proyectos'),
+        headers: await _headers(),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+
+        List<dynamic> data;
+
+        // El backend puede devolver lista directa o paginada
+        if (body is List) {
+          data = body;
+        } else if (body is Map && body.containsKey('content')) {
+          data = body['content'] as List;
+        } else if (body is Map && body.containsKey('proyecto')) {
+          data = [body];
+        } else {
+          data = [];
+        }
+
+        // =====================================================
+        // 4. QUITAR LOS PROYECTOS DONDE EL USUARIO YA FUE
+        //    ACEPTADO
+        // =====================================================
+        final proyectosDisponibles = data.where((p) {
+          final proyectoId = p['id'];
+
+          return !idsProyectosAceptados.contains(proyectoId);
+        }).toList();
+
+        // =====================================================
+        // 5. ACTUALIZAR LA LISTA
+        // =====================================================
+        setState(() {
+          _allProjects = proyectosDisponibles;
+          _filteredAll = proyectosDisponibles;
+          _isLoadingAll = false;
+        });
+      } else {
+        setState(() {
+          _errorAll = 'Error ${response.statusCode}';
+          _isLoadingAll = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorAll = 'Error de conexión: $e';
+          _isLoadingAll = false;
+        });
+      }
+    }
+  }
+
+  /*Future<void> _loadAllProjects() async {
+    setState(() {
+      _isLoadingAll = true;
+      _errorAll = null;
+    });
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/api/proyectos'),
@@ -105,7 +220,7 @@ class _ProjectScreenState extends State<ProjectScreen>
           _isLoadingAll = false;
         });
     }
-  }
+  }*/
 
   /*Future<void> _loadAllProjects() async {
     setState(() { _isLoadingAll = true; _errorAll = null; });
@@ -450,7 +565,9 @@ class _ProjectScreenState extends State<ProjectScreen>
                       ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color.fromARGB(255, 7, 83, 11),
-                        side: BorderSide(color: const Color.fromARGB(255, 7, 83, 11)),
+                        side: BorderSide(
+                          color: const Color.fromARGB(255, 7, 83, 11),
+                        ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 4,
@@ -728,7 +845,11 @@ class _ProjectScreenState extends State<ProjectScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.send_rounded, color: const Color.fromARGB(255, 7, 83, 11), size: 48),
+            Icon(
+              Icons.send_rounded,
+              color: const Color.fromARGB(255, 7, 83, 11),
+              size: 48,
+            ),
             const SizedBox(height: 12),
             Text(
               '¿Solicitar unirte a\n"${proyecto['nombre']}"?',

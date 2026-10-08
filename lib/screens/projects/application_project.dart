@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:app_tesis/screens/projects/state_application.dart';
+import 'package:goblink_park/screens/projects/state_application.dart';
 
 class ApplicationProjectScreeen extends StatelessWidget {
   const ApplicationProjectScreeen({super.key});

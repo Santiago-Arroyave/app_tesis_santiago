@@ -4,7 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class AuthService {
   //static const _baseUrl = 'http://10.0.2.2:8080'; // localhost en emulador Android

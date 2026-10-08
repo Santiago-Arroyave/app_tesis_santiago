@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:app_tesis/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class ScheduleScreen extends StatefulWidget {
   final List<dynamic> actividades;

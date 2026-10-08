@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:app_tesis/models/weather_model.dart';
+import 'package:goblink_park/models/weather_model.dart';
 import 'package:http/http.dart' as http;
 
 class WeatherProvider extends ChangeNotifier{

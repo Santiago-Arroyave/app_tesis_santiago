@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
-import 'package:app_tesis/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'observation_detail_screen.dart';
 import 'observation_edit_screen.dart';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class MyObservationsScreen extends StatefulWidget {
   const MyObservationsScreen({super.key});

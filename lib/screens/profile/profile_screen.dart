@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:app_tesis/screens/profile/edit_profile_screen.dart';
-import 'package:app_tesis/screens/profile/notifications_screen.dart';
-import 'package:app_tesis/screens/login_screen/login_screen.dart';
+import 'package:goblink_park/screens/profile/edit_profile_screen.dart';
+import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:goblink_park/screens/login_screen/login_screen.dart';
 
 import 'dart:convert';
 import 'dart:io';
 //import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:app_tesis/screens/login_screen/auth_service.dart';
-//import 'package:app_tesis/screens/login_screen/login_screen.dart';
-import 'package:app_tesis/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
+//import 'package:goblink_park/screens/login_screen/login_screen.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,6 +35,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ── Cargar perfil ──────────────────────────────────────────
 
   Future<void> _loadProfile() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final localData = await AuthService.getUserData();
+
+      if (!mounted) return;
+
+      if (localData != null) {
+        setState(() {
+          _usuario = localData;
+          _isLoading = false;
+        });
+
+        debugPrint('PERFIL CARGADO DESDE DATOS LOCALES');
+        debugPrint('USUARIO: $localData');
+      } else {
+        setState(() {
+          _errorMessage = 'No se encontraron datos del usuario';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'Error al cargar perfil: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  /*Future<void> _loadProfile() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final token = await AuthService.getToken();
+
+      if (token == null || token.isEmpty) {
+        setState(() {
+          _errorMessage = 'No se encontró la sesión del usuario';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/usuarios/perfil'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      debugPrint('GET PERFIL');
+      debugPrint('STATUS: ${response.statusCode}');
+      debugPrint('BODY: ${response.body}');
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Actualizar los datos guardados localmente
+        await AuthService.saveUserData(data);
+
+        if (!mounted) return;
+
+        setState(() {
+          _usuario = data;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Error al cargar perfil (${response.statusCode})';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'Error de conexión: $e';
+        _isLoading = false;
+      });
+    }
+  }*/
+
+  /*Future<void> _loadProfile() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -105,7 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
-  }
+  }*/
 
   Widget _buildAvatar() {
     final foto = _usuario?['fotoPerfil'];
@@ -348,7 +442,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color.fromARGB(255, 7, 83, 11)),
+              leading: const Icon(
+                Icons.camera_alt,
+                color: Color.fromARGB(255, 7, 83, 11),
+              ),
               title: const Text('Cámara'),
               onTap: () => Navigator.pop(ctx, 'camera'),
             ),
@@ -440,7 +537,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
 
-      final response = await request.send();
+      /*final response = await request.send();
 
       if (response.statusCode == 200) {
         await _loadProfile();
@@ -453,6 +550,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: Color.fromARGB(255, 7, 83, 11),
           ),
         );
+      }*/
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseBody = await response.stream.bytesToString();
+
+        debugPrint('RESPUESTA ACTUALIZAR PERFIL: $responseBody');
+
+        try {
+          final data = jsonDecode(responseBody);
+
+          // Actualizar inmediatamente los datos mostrados
+          await AuthService.saveUserData(data);
+
+          if (!mounted) return;
+
+          setState(() {
+            _usuario = data;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Perfil actualizado"),
+              backgroundColor: Color.fromARGB(255, 7, 83, 11),
+            ),
+          );
+        } catch (e) {
+          debugPrint('Error procesando respuesta del perfil: $e');
+
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Perfil actualizado"),
+              backgroundColor: Color.fromARGB(255, 7, 83, 11),
+            ),
+          );
+        }
       } else {
         if (!mounted) return;
 

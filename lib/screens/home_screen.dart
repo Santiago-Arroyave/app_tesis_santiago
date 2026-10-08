@@ -1,12 +1,12 @@
 //import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
-import 'package:app_tesis/providers/weather_provider.dart';
+import 'package:goblink_park/providers/weather_provider.dart';
 //import 'package:recipe_book/models/recipe_model.dart';
 //import 'package:recipe_book/providers/recipes_provider.dart';
-import 'package:app_tesis/screens/weather_details.dart';
+import 'package:goblink_park/screens/weather_details.dart';
 //import 'package:http/http.dart' as http;
-import 'package:app_tesis/l10n/app_localizations.dart';
+import 'package:goblink_park/l10n/app_localizations.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
