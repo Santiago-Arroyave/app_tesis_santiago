@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:goblink_park/screens/login_screen/login_screen.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
-import 'package:goblink_park/screens/main_home.dart';
 import 'package:goblink_park/screens/main_map/main_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -39,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
       // ===================================================
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => MainNavigation()),
+        MaterialPageRoute(builder: (_) => const MainNavigation()),
       );
     } else {
       // ===================================================
@@ -58,13 +57,13 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 🌄 Fondo
-          Image.asset('assets/images/Fondo.jpeg', fit: BoxFit.cover),
+          // 🌄 Fondo unificado con el Login
+          Image.asset('assets/images/Fondo-Login.png', fit: BoxFit.cover),
 
-          // 🌑 Capa oscura
-          Container(color: Colors.black.withOpacity(0.4)),
+          // 🌑 Capa oscura de contraste
+          Container(color: const Color(0x66000000)),
 
-          // 🌿 Logo centrado
+          // 🌿 Logo centrado y marca
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -77,21 +76,29 @@ class _SplashScreenState extends State<SplashScreen> {
                   "GoblinPark",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
           ),
 
-          // 🔄 Loader abajo
+          // 🔄 Loader sutil abajo
           const Positioned(
             bottom: 40,
             left: 0,
             right: 0,
             child: Center(
-              child: CircularProgressIndicator(color: Colors.white),
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              ),
             ),
           ),
         ],
