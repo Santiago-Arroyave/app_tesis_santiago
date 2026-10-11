@@ -5,6 +5,7 @@ import 'package:goblink_park/providers/weather_provider.dart';
 //import 'package:recipe_book/models/recipe_model.dart';
 //import 'package:recipe_book/providers/recipes_provider.dart';
 import 'package:goblink_park/screens/weather_details.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 //import 'package:http/http.dart' as http;
 import 'package:goblink_park/l10n/app_localizations.dart';
 
@@ -28,7 +29,7 @@ class HomeScreen extends StatelessWidget {
             return ListView.builder(
               itemCount: provider.weathers.length,
               itemBuilder: (context, index) {
-                return _RecipesCard(context, provider.weathers[index]);
+                return _recipesCard(context, provider.weathers[index]);
               },
             );
           }
@@ -57,7 +58,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _RecipesCard(BuildContext context, dynamic recipe) {
+  Widget _recipesCard(BuildContext context, dynamic recipe) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -69,20 +70,22 @@ class HomeScreen extends StatelessWidget {
       },
       child: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Container(
+        child: SizedBox(
           width: MediaQuery.of(context).size.width,
           height: 125,
           child: Card(
             child: Row(
               children: <Widget>[
-                Container(
+                SizedBox(
                   height: 125,
                   width: 100,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      recipe.img_link,
+                    child: CachedNetworkImage(
+                      imageUrl: recipe.img_link,
                       fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(color: Colors.grey.shade200),
+                      errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.grey),
                     ),
                   ),
                 ),

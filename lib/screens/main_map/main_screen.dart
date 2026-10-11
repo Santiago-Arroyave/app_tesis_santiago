@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:goblink_park/screens/main_map/home_map_screen.dart';
-//import 'package:goblink_park/screens/observations/observations_screen.dart';
-import 'package:goblink_park/screens/projects/project_screen.dart';
-import 'package:goblink_park/screens/profile/profile_screen.dart';
-//import 'package:goblink_park/screens/report_map/report_maps.dart';
-//import 'package:goblink_park/screens/report_map/report_map_service.dart';
 import 'package:goblink_park/screens/observations/my_observations_screen.dart';
-import 'package:goblink_park/screens/observations/observation_map_screen.dart';
+import 'package:goblink_park/screens/profile/profile_screen.dart';
+import 'package:goblink_park/screens/projects/project_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -20,158 +16,68 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _screens = const [
     HomeMapScreen(),
-    ProjectScreen(),
-    ObservationMapScreen(),
     MyObservationsScreen(),
+    ProjectScreen(),
     ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 👇 ESTO mantiene las pantallas vivas (como apps reales)
-      body: IndexedStack(index: _currentIndex, children: _screens),
-
-      // 👇 MENÚ INFERIOR SIEMPRE VISIBLE
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: const Color.fromARGB(255, 7, 83, 11),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: [
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/Inicio.png',
-              width: 24,
-              height: 24,
-              color: Colors.grey,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/Inicio.png',
-              width: 24,
-              height: 24,
-              color: const Color.fromARGB(255, 7, 83, 11),
-            ),
-            label: 'Inicio',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/Hacer reporte.png',
-              width: 24,
-              height: 24,
-              color: Colors.grey,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/Hacer reporte.png',
-              width: 24,
-              height: 24,
-              color: const Color.fromARGB(255, 7, 83, 11),
-            ),
-            label: 'Proyectos',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/mapa.png',
-              width: 24,
-              height: 24,
-              color: Colors.grey,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/mapa.png',
-              width: 24,
-              height: 24,
-              color: const Color.fromARGB(255, 7, 83, 11),
-            ),
-            label: 'Reportes',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/Registro Reportes.png',
-              width: 24,
-              height: 24,
-              color: Colors.grey,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/Registro Reportes.png',
-              width: 24,
-              height: 24,
-              color: const Color.fromARGB(255, 7, 83, 11),
-            ),
-            label: 'Ver Reportes',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/usuario.png',
-              width: 24,
-              height: 24,
-              color: Colors.grey,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/usuario.png',
-              width: 24,
-              height: 24,
-              color: const Color.fromARGB(255, 7, 83, 11),
-            ),
-            label: 'Perfil',
-          ),
-        ],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
       ),
-      /*bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: Colors.green,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home), // 0
-            label: "",
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFE5E7EB), width: 1.0),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.work), // 1 → Project
-            label: "",
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x12000000),
+              blurRadius: 10,
+              offset: Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          selectedItemColor: const Color(0xFF1E5E3A),
+          unselectedItemColor: const Color(0xFF9CA3AF),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.remove_red_eye), // 2 → Observations
-            label: "",
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 12,
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map), // 3 → ReportMap
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person), // 4 → Profile
-            label: "",
-          ),
-        ],
-        /*items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.layers),
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.file_present),
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: "",
-          ),
-        ],*/
-      ),*/
+          onTap: (index) => setState(() => _currentIndex = index),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.explore_rounded),
+              label: 'Inicio',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.assignment_outlined),
+              label: 'Reportes',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.folder_outlined),
+              label: 'Proyectos',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: 'Perfil',
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1292,11 +1292,23 @@ class _ProjectScreenState extends State<ProjectScreen>
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: project.imageUrl.isNotEmpty
-                  ? Image.network(
-                      project.imageUrl,
+                  ? CachedNetworkImage(
+                      imageUrl: project.imageUrl,
                       width: 52,
                       height: 52,
                       fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        width: 52,
+                        height: 52,
+                        color: Colors.green.shade50,
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        width: 52,
+                        height: 52,
+                        color: Colors.green.shade100,
+                        child: Icon(Icons.eco,
+                            color: Colors.green.shade700, size: 28),
+                      ),
                     )
                   : Container(
                       width: 52,

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -24,7 +25,6 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  static const _baseUrl = '${ApiConfig.baseUrl}';
 
   /*void _openActivity(Map<String, dynamic> actividad) {
     Navigator.push(
@@ -181,12 +181,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   act['fotoEvidencia'].toString().isNotEmpty)
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(6),
-                                  child: Image.network(
-                                    act['fotoEvidencia'],
+                                  child: CachedNetworkImage(
+                                    imageUrl: act['fotoEvidencia'],
                                     width: 40,
                                     height: 40,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
+                                    placeholder: (context, url) => Container(
+                                      width: 40,
+                                      height: 40,
+                                      color: Colors.grey.shade100,
+                                    ),
+                                    errorWidget: (context, url, error) =>
                                         const SizedBox(),
                                   ),
                                 )
@@ -233,7 +238,7 @@ class _ActivityDetailScreen extends StatefulWidget {
 }
 
 class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
-  static const _baseUrl = '${ApiConfig.baseUrl}';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   final _obsController = TextEditingController();
   final _descController = TextEditingController();
@@ -941,12 +946,24 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
                 // Mostrar por URL
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    act['urlEvidencia'],
+                  child: CachedNetworkImage(
+                    imageUrl: act['urlEvidencia'],
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    placeholder: (context, url) => Container(
+                      width: double.infinity,
+                      height: 200,
+                      color: Colors.grey.shade100,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       width: double.infinity,
                       height: 120,
                       decoration: BoxDecoration(
@@ -974,7 +991,7 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (context, error, stackTrace) => Container(
                       width: double.infinity,
                       height: 120,
                       decoration: BoxDecoration(

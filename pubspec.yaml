@@ -49,6 +49,9 @@ dependencies:
   path_provider: ^2.0.14
   open_filex: ^4.7.0
   geolocator: ^14.0.3
+  shared_preferences: ^2.5.6
+  local_auth: ^3.0.2
+  cached_network_image: 3.3.1
 
 dev_dependencies:
   flutter_test:

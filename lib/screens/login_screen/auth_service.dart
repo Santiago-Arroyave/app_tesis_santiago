@@ -44,6 +44,12 @@ static Future<Map<String, dynamic>?> getUserData() async {
 static Future<void> deleteUserData() async =>
     await _storage.delete(key: 'user_data');
 
+  static Future<void> logout() async {
+    await deleteToken();
+    await deleteUserId();
+    await deleteUserData();
+  }
+
   // ── Registro ──────────────────────────────────────────────
   static Future<AuthResult> register({
     required String nombres,

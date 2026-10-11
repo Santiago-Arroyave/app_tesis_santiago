@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'observation_edit_screen.dart';
 
 class ObservationDetailScreen extends StatelessWidget {
@@ -182,28 +183,42 @@ class ObservationDetailScreen extends StatelessWidget {
                 itemCount: evidencias.length,
                 itemBuilder: (_, i) {
                   final ev = evidencias[i];
+                  final urlArchivo = ev['urlArchivo']?.toString() ??
+                      ev['archivoUrl']?.toString() ??
+                      ev['url']?.toString() ??
+                      '';
                   final base64Str =
                       ev['archivoBase64']?.toString() ?? '';
-                  final urlArchivo =
-                      ev['urlArchivo']?.toString() ?? '';
 
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: base64Str.isNotEmpty
-                        ? Image.memory(
-                            base64Decode(base64Str),
+                    child: urlArchivo.isNotEmpty &&
+                            (urlArchivo.startsWith('http://') ||
+                                urlArchivo.startsWith('https://'))
+                        ? CachedNetworkImage(
+                            imageUrl: urlArchivo,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey.shade200,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
                               color: Colors.grey.shade200,
                               child: Icon(Icons.broken_image,
                                   color: Colors.grey.shade400),
                             ),
                           )
-                        : urlArchivo.isNotEmpty
-                            ? Image.network(
-                                urlArchivo,
+                        : base64Str.isNotEmpty
+                            ? Image.memory(
+                                base64Decode(base64Str),
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
+                                errorBuilder: (context, error, stackTrace) => Container(
                                   color: Colors.grey.shade200,
                                   child: Icon(Icons.broken_image,
                                       color: Colors.grey.shade400),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 //import 'package:recipe_book/providers/recipes_provider.dart';
 import 'package:goblink_park/providers/weather_provider.dart';
 import 'package:goblink_park/models/weather_model.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 
 class WeatherDetails extends StatefulWidget {
@@ -10,7 +11,7 @@ class WeatherDetails extends StatefulWidget {
   const WeatherDetails({super.key, required this.weatherData});
 
   @override
-  _WeatherDetailState createState() => _WeatherDetailState();
+  State<WeatherDetails> createState() => _WeatherDetailState();
 }
 
 class _WeatherDetailState extends State<WeatherDetails>
@@ -97,7 +98,11 @@ class _WeatherDetailState extends State<WeatherDetails>
         padding: EdgeInsets.all(18),
         child: Column(
           children: [
-            Image.network(widget.weatherData.img_link),
+            CachedNetworkImage(
+              imageUrl: widget.weatherData.img_link,
+              placeholder: (context, url) => Container(height: 150, color: Colors.grey.shade200),
+              errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.grey),
+            ),
             SizedBox(height: 8),
             Text(widget.weatherData.name),
             SizedBox(height: 8),

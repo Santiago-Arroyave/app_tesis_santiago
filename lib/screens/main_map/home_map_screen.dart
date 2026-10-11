@@ -1,13 +1,22 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:http/http.dart' as http;
-import 'package:goblink_park/screens/login_screen/auth_service.dart';
-import 'dart:typed_data';
-import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:goblink_park/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/main_map/map_filter_sheet.dart';
+import 'package:goblink_park/screens/observations/my_observations_screen.dart';
+import 'package:goblink_park/screens/observations/observation_form_screen.dart';
+import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:goblink_park/screens/projects/project_screen.dart';
+import 'package:goblink_park/screens/reports/report_detail_screen.dart';
+
+enum MapLayerType { satellite, topographic, standard }
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -16,29 +25,42 @@ class HomeMapScreen extends StatefulWidget {
   State<HomeMapScreen> createState() => _HomeMapScreenState();
 }
 
-class _HomeMapScreenState extends State<HomeMapScreen> {
-  static const _baseUrl =
-      '${ApiConfig.baseUrl}'; // URL de producción
-  //static const _initialCenter = LatLng(4.0847, -76.1954);
-  // Ubicación inicial de respaldo
-  static const _defaultCenter = LatLng(4.0847, -76.1954);
+class _HomeMapScreenState extends State<HomeMapScreen>
+    with TickerProviderStateMixin {
+  static const _baseUrl = ApiConfig.baseUrl;
+  static const _defaultCenter = LatLng(3.9123, -76.6721); // PNR Páramo del Duende
 
   List<dynamic> _reportes = [];
   bool _isLoading = true;
-
   LatLng? _currentLocation;
-
   StreamSubscription<Position>? _positionSubscription;
 
   final MapController _mapController = MapController();
+  final TextEditingController _searchController = TextEditingController();
+
+  MapLayerType _currentMapLayer = MapLayerType.satellite;
+  String _searchQuery = '';
+  MapFilterOptions _filters = const MapFilterOptions();
+
+  // Reporte seleccionado actualmente en el mapa
+  Map<String, dynamic>? _selectedReporte;
+
+  // Estado de expansión del panel de accesos rápidos
+  bool _isQuickActionsExpanded = true;
 
   @override
   void initState() {
     super.initState();
-
     _loadReportes();
     _getCurrentLocation();
     _startLocationTracking();
+  }
+
+  @override
+  void dispose() {
+    _positionSubscription?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadReportes() async {
@@ -54,12 +76,6 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
       if (!mounted) return;
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-
-        debugPrint('========================================');
-        debugPrint('RESPUESTA API REPORTES:');
-        debugPrint(const JsonEncoder.withIndent('  ').convert(body));
-        debugPrint('========================================');
-
         List<dynamic> data;
         if (body is List) {
           data = body;
@@ -85,14 +101,12 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
   Future<void> _getCurrentLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-
       if (!serviceEnabled) {
         debugPrint('El servicio de ubicación está desactivado');
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
-
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
@@ -104,24 +118,17 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
 
       if (!mounted) return;
-
       final location = LatLng(position.latitude, position.longitude);
 
       setState(() {
         _currentLocation = location;
       });
 
-      // Centrar el mapa en la ubicación real
-      _mapController.move(location, 15);
-
-      debugPrint(
-        'Ubicación actual: '
-        '${position.latitude}, ${position.longitude}',
-      );
+      _animatedMapMove(location, 15.5);
     } catch (e) {
       debugPrint('Error obteniendo ubicación: $e');
     }
@@ -135,40 +142,273 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
 
     _positionSubscription =
         Geolocator.getPositionStream(locationSettings: locationSettings).listen(
-          (Position position) {
-            if (!mounted) return;
-
-            final location = LatLng(position.latitude, position.longitude);
-
-            setState(() {
-              _currentLocation = location;
-            });
-
-            _mapController.move(location, 15);
-          },
-        );
+      (Position position) {
+        if (!mounted) return;
+        final location = LatLng(position.latitude, position.longitude);
+        setState(() {
+          _currentLocation = location;
+        });
+      },
+    );
   }
 
-  @override
-  void dispose() {
-    _positionSubscription?.cancel();
-    super.dispose();
+  // Animación de cámara suave para desplazar y centrar el mapa
+  void _animatedMapMove(LatLng destLocation, double destZoom) {
+    final currentCenter = _mapController.camera.center;
+    final currentZoom = _mapController.camera.zoom;
+
+    final latTween = Tween<double>(
+      begin: currentCenter.latitude,
+      end: destLocation.latitude,
+    );
+    final lngTween = Tween<double>(
+      begin: currentCenter.longitude,
+      end: destLocation.longitude,
+    );
+    final zoomTween = Tween<double>(
+      begin: currentZoom,
+      end: destZoom,
+    );
+
+    final controller = AnimationController(
+      duration: const Duration(milliseconds: 650),
+      vsync: this,
+    );
+
+    final animation = CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeInOutCubic,
+    );
+
+    controller.addListener(() {
+      _mapController.move(
+        LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)),
+        zoomTween.evaluate(animation),
+      );
+    });
+
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+        controller.dispose();
+      }
+    });
+
+    controller.forward();
   }
 
-  Color _priorityColor(String? prioridad) {
-    switch (prioridad?.toLowerCase()) {
-      case 'alta':
-        return Colors.red;
-      case 'media':
-        return Colors.orange;
-      case 'baja':
-        return Color.fromARGB(255, 7, 83, 11);
-      default:
-        return Colors.blue;
+  // Enfoque y animación de cámara hacia los reportes de una categoría
+  void _focusOnCategoryReports(String? category) {
+    List<dynamic> targetList;
+    if (category == null || category == 'Todos') {
+      targetList = _reportes;
+    } else {
+      targetList = _reportes.where((r) => _matchesCategory(r, category)).toList();
+    }
+
+    if (targetList.isNotEmpty) {
+      double sumLat = 0;
+      double sumLng = 0;
+      int count = 0;
+
+      for (final r in targetList) {
+        final lat = (r['latitud'] as num?)?.toDouble();
+        final lng = (r['longitud'] as num?)?.toDouble();
+        if (lat != null && lng != null) {
+          sumLat += lat;
+          sumLng += lng;
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        final targetCenter = LatLng(sumLat / count, sumLng / count);
+        _animatedMapMove(targetCenter, category == null ? 14.0 : 15.2);
+      }
     }
   }
 
-  String _categoryImage(String? categoria) {
+  String _getTileUrl() {
+    switch (_currentMapLayer) {
+      case MapLayerType.satellite:
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      case MapLayerType.topographic:
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
+      case MapLayerType.standard:
+        return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    }
+  }
+
+  bool _matchesCategory(dynamic r, String catKey) {
+    final cat = (r['categoriaNombre'] ?? r['categoria']?['nombre'] ?? '')
+        .toString()
+        .toLowerCase();
+    switch (catKey.toLowerCase()) {
+      case 'flora':
+        return cat.contains('flora') ||
+            cat.contains('vegetal') ||
+            cat.contains('árbol') ||
+            cat.contains('bosque');
+      case 'fauna':
+        return cat.contains('fauna') ||
+            cat.contains('animal') ||
+            cat.contains('avistamiento') ||
+            cat.contains('pájaro') ||
+            cat.contains('ave');
+      case 'suelo':
+        return cat.contains('suelo') || cat.contains('tierra');
+      case 'agua':
+        return cat.contains('agua') ||
+            cat.contains('hídric') ||
+            cat.contains('río') ||
+            cat.contains('quebrada') ||
+            cat.contains('laguna');
+      case 'aire':
+        return cat.contains('aire') ||
+            cat.contains('clima') ||
+            cat.contains('viento') ||
+            cat.contains('atmósfer');
+      default:
+        return cat.contains(catKey.toLowerCase());
+    }
+  }
+
+  int get _countTodos => _reportes.length;
+  int get _countFlora => _reportes.where((r) => _matchesCategory(r, 'flora')).length;
+  int get _countFauna => _reportes.where((r) => _matchesCategory(r, 'fauna')).length;
+  int get _countSuelo => _reportes.where((r) => _matchesCategory(r, 'suelo')).length;
+  int get _countAgua => _reportes.where((r) => _matchesCategory(r, 'agua')).length;
+  int get _countAire => _reportes.where((r) => _matchesCategory(r, 'aire')).length;
+
+  List<dynamic> get _filteredReportes {
+    return _reportes.where((r) {
+      if (r['latitud'] == null || r['longitud'] == null) return false;
+
+      // 1. Filtro de Categoría
+      if (_filters.category != null && _filters.category != 'Todas') {
+        if (!_matchesCategory(r, _filters.category!)) return false;
+      }
+
+      // 2. Filtro de Estado
+      if (_filters.status != null && _filters.status != 'Todos') {
+        final est = (r['estadoReporteNombre'] ?? r['estado']?['nombre'] ?? '')
+            .toString()
+            .toLowerCase();
+        if (!est.contains(_filters.status!.toLowerCase())) return false;
+      }
+
+      // 3. Filtro de Prioridad
+      if (_filters.priority != null && _filters.priority != 'Todas') {
+        final prio = (r['prioridadNombre'] ?? r['prioridad']?['nombre'] ?? '')
+            .toString()
+            .toLowerCase();
+        if (!prio.contains(_filters.priority!.toLowerCase())) return false;
+      }
+
+      // 4. Filtro de Rango de Fechas
+      if (_filters.dateRange != null) {
+        final rawDate = r['fechaReporte'] ?? r['fechaCreacion'];
+        if (rawDate != null) {
+          try {
+            final dt = DateTime.parse(rawDate.toString());
+            final start = _filters.dateRange!.start;
+            final end = _filters.dateRange!.end.add(const Duration(days: 1));
+            if (dt.isBefore(start) || dt.isAfter(end)) return false;
+          } catch (_) {}
+        }
+      }
+
+      // 5. Filtro de Texto de Búsqueda
+      if (_searchQuery.trim().isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final titulo = (r['titulo'] ?? '').toString().toLowerCase();
+        final desc = (r['descripcion'] ?? '').toString().toLowerCase();
+        final cat = (r['categoriaNombre'] ?? '').toString().toLowerCase();
+        final sector = (r['sector'] ?? r['ubicacionTexto'] ?? '').toString().toLowerCase();
+        if (!titulo.contains(q) &&
+            !desc.contains(q) &&
+            !cat.contains(q) &&
+            !sector.contains(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  IconData _getCategoryIcon(String? cat) {
+    final c = cat?.toLowerCase() ?? '';
+    if (c.contains('fauna') || c.contains('animal') || c.contains('avistamiento')) {
+      return Icons.pets;
+    }
+    if (c.contains('flora') || c.contains('vegetal') || c.contains('árbol') || c.contains('bosque')) {
+      return Icons.eco;
+    }
+    if (c.contains('suelo') || c.contains('tierra')) {
+      return Icons.landscape;
+    }
+    if (c.contains('agua') || c.contains('hídric') || c.contains('río')) {
+      return Icons.water_drop;
+    }
+    if (c.contains('aire') || c.contains('clima') || c.contains('viento')) {
+      return Icons.air;
+    }
+    return Icons.eco;
+  }
+
+  Color _getCategoryPinColor(String? cat) {
+    final c = cat?.toLowerCase() ?? '';
+    if (c.contains('fauna') || c.contains('animal') || c.contains('avistamiento')) {
+      return const Color(0xFF9A6735); // Ocre / Marrón fauna
+    }
+    if (c.contains('flora') || c.contains('vegetal') || c.contains('árbol')) {
+      return const Color(0xFF1E5E3A); // Verde institucional flora
+    }
+    if (c.contains('suelo') || c.contains('tierra')) {
+      return const Color(0xFF8C5E48); // Café arcilla suelo
+    }
+    if (c.contains('agua') || c.contains('hídric')) {
+      return const Color(0xFF2563EB); // Azul hídrico agua
+    }
+    if (c.contains('aire') || c.contains('clima')) {
+      return const Color(0xFF0284C7); // Celeste / Cian aire
+    }
+    return const Color(0xFF1E5E3A);
+  }
+
+  Color _getStatusColor(String? status) {
+    final s = status?.toLowerCase() ?? '';
+    if (s.contains('valid') || s.contains('aprob')) return const Color(0xFF15803D);
+    if (s.contains('revis')) return const Color(0xFFB45309);
+    if (s.contains('seguim')) return const Color(0xFF0284C7);
+    return const Color(0xFF6B7280);
+  }
+
+  Color _getStatusBgColor(String? status) {
+    final s = status?.toLowerCase() ?? '';
+    if (s.contains('valid') || s.contains('aprob')) return const Color(0xFFDCFCE7);
+    if (s.contains('revis')) return const Color(0xFFFEF3C7);
+    if (s.contains('seguim')) return const Color(0xFFE0F2FE);
+    return const Color(0xFFF3F4F6);
+  }
+
+  Color _getPriorityColor(String? prioridad) {
+    final p = prioridad?.toLowerCase() ?? '';
+    if (p.contains('alta')) return const Color(0xFFEF4444);
+    if (p.contains('med')) return const Color(0xFFF59E0B);
+    if (p.contains('baj')) return const Color(0xFF10B981);
+    return const Color(0xFF6B7280);
+  }
+
+  Color _getPriorityBgColor(String? prioridad) {
+    final p = prioridad?.toLowerCase() ?? '';
+    if (p.contains('alta')) return const Color(0xFFFEF2F2);
+    if (p.contains('med')) return const Color(0xFFFFFBEB);
+    if (p.contains('baj')) return const Color(0xFFF0FDF4);
+    return const Color(0xFFF3F4F6);
+  }
+
+  String _categoryAsset(String? categoria) {
     const map = {
       'Fauna': 'assets/images/Oso de anteojos-2.jpeg',
       'Flora': 'assets/images/Flora.jpeg',
@@ -176,29 +416,49 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
       'Aire': 'assets/images/Aire.jpeg',
       'Suelo': 'assets/images/Suelo.jpeg',
     };
-    return map[categoria] ?? 'assets/images/Oso de anteojos-2.jpeg';
+    return map[categoria] ?? 'assets/images/Flora.jpeg';
+  }
+
+  String? _getObservationImageUrl(Map<String, dynamic> reporte) {
+    try {
+      final fotoPrincipal = reporte['fotoPrincipalUrl'] ?? reporte['fotoUrl'] ?? reporte['urlFoto'] ?? reporte['foto'];
+      if (fotoPrincipal != null && fotoPrincipal.toString().trim().isNotEmpty) {
+        final str = fotoPrincipal.toString().trim();
+        if (str.startsWith('http://') || str.startsWith('https://')) {
+          return str;
+        }
+      }
+      final evidencias = reporte['evidencias'];
+      if (evidencias is List && evidencias.isNotEmpty) {
+        for (final evidencia in evidencias) {
+          if (evidencia is Map) {
+            final evUrl = evidencia['archivoUrl'] ?? evidencia['url'] ?? evidencia['urlArchivo'];
+            if (evUrl != null && evUrl.toString().trim().isNotEmpty) {
+              final str = evUrl.toString().trim();
+              if (str.startsWith('http://') || str.startsWith('https://')) {
+                return str;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   Uint8List? _getObservationImage(Map<String, dynamic> reporte) {
     try {
       String? base64Image;
-
-      // 1. Primero intentamos tomar la imagen principal
-      final fotoPrincipal = reporte['fotoPrincipalUrl'];
-
+      final fotoPrincipal = reporte['fotoPrincipalUrl'] ?? reporte['fotoUrl'];
       if (fotoPrincipal != null && fotoPrincipal.toString().trim().isNotEmpty) {
         base64Image = fotoPrincipal.toString().trim();
       }
 
-      // 2. Si no existe, buscamos en evidencias
       if (base64Image == null) {
         final evidencias = reporte['evidencias'];
-
         if (evidencias is List && evidencias.isNotEmpty) {
           for (final evidencia in evidencias) {
             if (evidencia is Map &&
-                evidencia['tipoArchivo']?.toString().toLowerCase() ==
-                    'imagen' &&
                 evidencia['archivoBase64'] != null &&
                 evidencia['archivoBase64'].toString().trim().isNotEmpty) {
               base64Image = evidencia['archivoBase64'].toString().trim();
@@ -208,16 +468,10 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
         }
       }
 
-      if (base64Image == null || base64Image.isEmpty) {
-        return null;
-      }
-
-      // Por si algún día el backend envía:
-      // data:image/jpeg;base64,...
+      if (base64Image == null || base64Image.isEmpty) return null;
       if (base64Image.contains(',')) {
         base64Image = base64Image.split(',').last;
       }
-
       return base64Decode(base64Image);
     } catch (e) {
       debugPrint('Error al decodificar imagen del reporte: $e');
@@ -225,603 +479,495 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     }
   }
 
-  String? _observationImage(Map<String, dynamic> reporte) {
-    // Posibles nombres de campo para una imagen individual
-    final possibleFields = [
-      'imagenUrl',
-      'imagen',
-      'fotoUrl',
-      'foto',
-      'imagenReporte',
-      'evidenciaUrl',
-    ];
-
-    for (final field in possibleFields) {
-      final value = reporte[field];
-
-      if (value != null && value.toString().trim().isNotEmpty) {
-        return _resolveImageUrl(value.toString());
-      }
+  String _formatReportDate(dynamic dateVal) {
+    if (dateVal == null) return 'Reciente';
+    final str = dateVal.toString();
+    try {
+      final dt = DateTime.parse(str);
+      const months = [
+        'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+        'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+      ];
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final minute = dt.minute.toString().padLeft(2, '0');
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year} · $hour:$minute';
+    } catch (_) {
+      if (str.length >= 10) return str.substring(0, 10);
+      return str;
     }
-
-    // Si el backend devuelve una lista de evidencias/imágenes
-    final possibleLists = [
-      'imagenes',
-      'evidencias',
-      'evidenciasReporte',
-      'fotos',
-    ];
-
-    for (final field in possibleLists) {
-      final value = reporte[field];
-
-      if (value is List && value.isNotEmpty) {
-        final first = value.first;
-
-        if (first is String && first.trim().isNotEmpty) {
-          return _resolveImageUrl(first);
-        }
-
-        if (first is Map<String, dynamic>) {
-          final imageValue =
-              first['url'] ??
-              first['imagenUrl'] ??
-              first['imagen'] ??
-              first['ruta'] ??
-              first['path'];
-
-          if (imageValue != null && imageValue.toString().trim().isNotEmpty) {
-            return _resolveImageUrl(imageValue.toString());
-          }
-        }
-      }
-    }
-
-    return null;
   }
 
-  String _resolveImageUrl(String url) {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
+  void _onMarkerTapped(Map<String, dynamic> reporte) {
+    final lat = (reporte['latitud'] as num).toDouble();
+    final lng = (reporte['longitud'] as num).toDouble();
+    final point = LatLng(lat, lng);
 
-    if (url.startsWith('/')) {
-      return '$_baseUrl$url';
-    }
+    setState(() {
+      _selectedReporte = reporte;
+    });
 
-    return '$_baseUrl/$url';
+    _animatedMapMove(point, 16.5);
   }
 
-  void _showObservationDetail(Map<String, dynamic> reporte) {
-    final Uint8List? observationImage = _getObservationImage(reporte);
+  Future<void> _navigateToReportDetail(Map<String, dynamic> reporte) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportDetailScreen(reporte: reporte),
+      ),
+    );
 
+    if (result is Map && result['action'] == 'center_on_map') {
+      final targetReporte = result['reporte'] as Map<String, dynamic>? ?? reporte;
+      _onMarkerTapped(targetReporte);
+    }
+  }
+
+  void _onQuickChipTapped(String? catName) {
+    setState(() {
+      if (catName == null || catName == 'Todos') {
+        _filters = _filters.copyWith(category: () => null);
+      } else {
+        final current = _filters.category;
+        _filters = _filters.copyWith(
+          category: () => current == catName ? null : catName,
+        );
+      }
+      _selectedReporte = null;
+    });
+
+    _focusOnCategoryReports(_filters.category);
+  }
+
+  void _showLayersModal() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: SizedBox(
-          height: 104,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // =====================================================
-              // IMAGEN PRINCIPAL DE LA OBSERVACIÓN
-              // =====================================================
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: 82,
-                  height: 82,
-                  child: observationImage != null
-                      ? Image.memory(
-                          observationImage,
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                        )
-                      : Container(
-                          color: Colors.grey.shade200,
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            color: Colors.grey.shade500,
-                            size: 30,
-                          ),
-                        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
-
-              const SizedBox(width: 12),
-
-              // =====================================================
-              // INFORMACIÓN
-              // =====================================================
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        reporte['titulo']?.toString().isNotEmpty == true
-                            ? reporte['titulo'].toString()
-                            : 'Observación',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      Row(
-                        children: [
-                          Text(
-                            'Prioridad ${reporte['prioridadNombre'] ?? ''}',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          const SizedBox(width: 4),
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: _priorityColor(reporte['prioridadNombre']),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        'Estado: ${reporte['estadoReporteNombre'] ?? 'Pendiente'}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        'Fecha: ${reporte['fechaReporte'] != null ? reporte['fechaReporte'].toString().substring(0, 10) : ''}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              "Capa del Mapa",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F3A22),
               ),
-
-              // =====================================================
-              // CATEGORÍA - PEQUEÑA Y ARRIBA A LA DERECHA
-              // =====================================================
-              Padding(
-                padding: const EdgeInsets.only(top: 0, right: 0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
-                  child: Image.asset(
-                    _categoryImage(reporte['categoriaNombre']?.toString()),
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+            _buildLayerItem(
+              title: "Satelital (Alta Resolución)",
+              subtitle: "Esri World Imagery – Vegetación y relieve real",
+              icon: Icons.satellite_alt_rounded,
+              isSelected: _currentMapLayer == MapLayerType.satellite,
+              onTap: () {
+                setState(() => _currentMapLayer = MapLayerType.satellite);
+                Navigator.pop(ctx);
+              },
+            ),
+            _buildLayerItem(
+              title: "Relieve / Topográfico",
+              subtitle: "Esri World Topo – Curvas de nivel del páramo",
+              icon: Icons.terrain_rounded,
+              isSelected: _currentMapLayer == MapLayerType.topographic,
+              onTap: () {
+                setState(() => _currentMapLayer = MapLayerType.topographic);
+                Navigator.pop(ctx);
+              },
+            ),
+            _buildLayerItem(
+              title: "Estándar / Calles",
+              subtitle: "OpenStreetMap – Senderos y caminos principales",
+              icon: Icons.map_rounded,
+              isSelected: _currentMapLayer == MapLayerType.standard,
+              onTap: () {
+                setState(() => _currentMapLayer = MapLayerType.standard);
+                Navigator.pop(ctx);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
   }
 
-  /*void _showObservationDetail(Map<String, dynamic> reporte) {
+  Widget _buildLayerItem({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFE8F5E9) : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isSelected ? const Color(0xFF1E5E3A) : const Color(0xFFE5E7EB),
+          width: isSelected ? 1.5 : 1.0,
+        ),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: isSelected ? const Color(0xFF1E5E3A) : const Color(0xFF6B7280)),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            fontSize: 14,
+            color: isSelected ? const Color(0xFF0F3A22) : const Color(0xFF1F2937),
+          ),
+        ),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
+        trailing: isSelected
+            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF1E5E3A), size: 22)
+            : null,
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void _showFullFilterModal() {
+    MapFilterSheet.show(
+      context: context,
+      currentFilters: _filters,
+      onApply: (newFilters) {
+        setState(() {
+          _filters = newFilters;
+          _selectedReporte = null;
+        });
+        _focusOnCategoryReports(_filters.category);
+      },
+    );
+  }
+
+  void _showSueloAguaSelector() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Imagen de la observación
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  _categoryImage(reporte['categoriaNombre']),
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              const SizedBox(width: 14),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Seleccionar Tipo de Reporte",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F3A22),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ObservationFormScreen(
+                            location: _currentLocation ?? _defaultCenter,
+                            category: 'Suelo',
+                          ),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFAF5F0),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF8C5E48), width: 1.2),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.landscape, color: Color(0xFF8C5E48), size: 32),
+                          SizedBox(height: 8),
+                          Text(
+                            "Suelo",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF8C5E48),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ObservationFormScreen(
+                            location: _currentLocation ?? _defaultCenter,
+                            category: 'Agua',
+                          ),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF2563EB), width: 1.2),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.water_drop, color: Color(0xFF2563EB), size: 32),
+                          SizedBox(height: 8),
+                          Text(
+                            "Agua",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
 
-              // Info
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+  void _openMenuSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                ClipOval(
+                  child: Image.asset(
+                    'assets/images/Logo verde.png',
+                    width: 42,
+                    height: 42,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      reporte['categoriaNombre'] ?? 'Sin categoría',
-                      style: const TextStyle(
+                      "Monitoreo Duende",
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F3A22),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Text(
-                          'Prioridad ${reporte['prioridadNombre'] ?? ''} ',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        Icon(
-                          Icons.circle,
-                          size: 10,
-                          color: _priorityColor(reporte['prioridadNombre']),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
                     Text(
-                      'Estado: ${reporte['estadoReporteNombre'] ?? 'Pendiente'}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Fecha: ${reporte['fechaEvento']?.toString().substring(0, 10) ?? ''}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
+                      "PNR Páramo del Duende",
+                      style: TextStyle(fontSize: 12, color: Color(0xFF2E4F3E)),
                     ),
                   ],
                 ),
-              ),
-
-              // Foto perfil usuario (avatar)
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.green.shade100,
-                child: Text(
-                  (reporte['usuarioNombre'] ?? '?')[0].toUpperCase(),
-                  style: TextStyle(
-                    color: Colors.green.shade800,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }*/
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: _currentLocation ?? _defaultCenter,
-            initialZoom: 14,
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.app_tesis',
-            ),
-            MarkerLayer(
-              markers: [
-                // =========================================================
-                // MARCADORES DE LOS REPORTES
-                // =========================================================
-                ..._reportes.map((r) {
-                  final color = _priorityColor(r['prioridadNombre']);
-
-                  return Marker(
-                    point: LatLng(
-                      (r['latitud'] as num).toDouble(),
-                      (r['longitud'] as num).toDouble(),
-                    ),
-                    width: 44,
-                    height: 44,
-                    child: GestureDetector(
-                      onTap: () =>
-                          _showObservationDetail(Map<String, dynamic>.from(r)),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.4),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-
-                // =========================================================
-                // MARCADOR DE LA UBICACIÓN ACTUAL DEL USUARIO
-                // =========================================================
-                if (_currentLocation != null)
-                  Marker(
-                    point: _currentLocation!,
-                    width: 50,
-                    height: 50,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.blue.withValues(alpha: 0.20),
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.blue,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 4,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
-            /*MarkerLayer(
-              markers: _reportes.map((r) {
-                final color = _priorityColor(r['prioridadNombre']);
-                return Marker(
-                  point: LatLng(
-                    (r['latitud'] as num).toDouble(),
-                    (r['longitud'] as num).toDouble(),
-                  ),
-                  width: 44,
-                  height: 44,
-                  child: GestureDetector(
-                    onTap: () =>
-                        _showObservationDetail(Map<String, dynamic>.from(r)),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withValues(alpha: 0.4),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.location_on,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                  ),
+            const Divider(height: 28),
+            ListTile(
+              leading: const Icon(Icons.work_outline, color: Color(0xFF1E5E3A)),
+              title: const Text("Proyectos de Monitoreo", style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProjectScreen()),
                 );
-              }).toList(),
-            ),*/
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_none_rounded, color: Color(0xFF1E5E3A)),
+              title: const Text("Notificaciones y Solicitudes", style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh, color: Color(0xFF1E5E3A)),
+              title: const Text("Actualizar Reportes del Mapa", style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                _loadReportes();
+              },
+            ),
+            const SizedBox(height: 10),
           ],
         ),
+      ),
+    );
+  }
 
-        // Indicador de carga
-        if (_isLoading)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Cargando observaciones...',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
+  // ===========================================================================
+  // WIDGETS DE CABECERA, BUSCADOR Y CHIPS DE FILTRO RÁPIDO
+  // ===========================================================================
+
+  Widget _buildHeader() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F000000),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF0F3A22), size: 26),
+            onPressed: _openMenuSheet,
+          ),
+          const SizedBox(width: 2),
+          ClipOval(
+            child: Image.asset(
+              'assets/images/Logo verde.png',
+              width: 38,
+              height: 38,
+              fit: BoxFit.contain,
             ),
           ),
-
-        // Botón refresh
-        Positioned(
-          bottom: 24,
-          right: 16,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Monitoreo Duende",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F3A22),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  "PNR Páramo del Duende",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF2E4F3E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Stack(
             children: [
-              // Botón para ir a mi ubicación
-              FloatingActionButton.small(
-                heroTag: 'locationButton',
+              IconButton(
+                icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 26),
                 onPressed: () {
-                  if (_currentLocation != null) {
-                    _mapController.move(_currentLocation!, 17);
-                  } else {
-                    _getCurrentLocation();
-                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  );
                 },
-                backgroundColor: Colors.white,
-                child: const Icon(Icons.my_location, color: Colors.blue),
               ),
-
-              const SizedBox(height: 10),
-
-              // Botón actualizar reportes
-              FloatingActionButton.small(
-                heroTag: 'refreshButton',
-                onPressed: _loadReportes,
-                backgroundColor: Colors.white,
-                child: const Icon(
-                  Icons.refresh,
-                  color: Color.fromARGB(255, 7, 83, 11),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        /*Positioned(
-          bottom: 24,
-          right: 16,
-          child: FloatingActionButton.small(
-            onPressed: _loadReportes,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.refresh, color: Color.fromARGB(255, 7, 83, 11)),
-          ),
-        ),*/
-      ],
-    );
-  }
-}
-
-
-/*import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-
-class HomeMapScreen extends StatelessWidget {
-  const HomeMapScreen({super.key});
-
-   @override
-  Widget build(BuildContext context) {
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: LatLng(4.0847, -76.1954),
-        initialZoom: 14,
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-          userAgentPackageName: 'com.example.app_tesis',
-        ),
-        // 📍 Marcador ejemplo
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: LatLng(4.0847, -76.1954),
-                width: 40,
-                height: 40,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Colors.red,
-                  size: 40,
-                ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final LatLng center = LatLng(4.0847, -76.1954); // Tuluá
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inicio', style: TextStyle(color: Colors.white),),
-        backgroundColor: Colors.green,
-      ),
-      body: FlutterMap(
-        options: MapOptions(initialCenter: center, initialZoom: 14),
-        children: [
-          TileLayer(
-            urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-            userAgentPackageName: 'com.example.app_tesis',
-          ),
-
-          // 📍 Marcador ejemplo
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: center,
-                width: 40,
-                height: 40,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Colors.red,
-                  size: 40,
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4.5),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1E5E3A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text(
+                    '3',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -829,5 +975,1147 @@ class HomeMapScreen extends StatelessWidget {
         ],
       ),
     );
-  }*/
+  }
 
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
+        decoration: InputDecoration(
+          hintText: "Buscar reportes, lugares o coordenadas...",
+          hintStyle: const TextStyle(
+            fontSize: 13.5,
+            color: Color(0xFF9CA3AF),
+          ),
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280), size: 22),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_searchQuery.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, color: Color(0xFF9CA3AF), size: 18),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+              IconButton(
+                icon: Icon(
+                  Icons.tune,
+                  color: _filters.hasActiveFilters ? const Color(0xFF1E5E3A) : const Color(0xFF6B7280),
+                  size: 20,
+                ),
+                onPressed: _showFullFilterModal,
+              ),
+            ],
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickCategoryChips() {
+    final selCat = _filters.category;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8.0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            // 1. Todos
+            _buildQuickChip(
+              label: "Todos",
+              count: _countTodos,
+              icon: null,
+              isSelected: selCat == null || selCat == 'Todas',
+              activeColor: const Color(0xFF1E5E3A),
+              onTap: () => _onQuickChipTapped(null),
+            ),
+            const SizedBox(width: 8),
+
+            // 2. Flora
+            _buildQuickChip(
+              label: "Flora",
+              count: _countFlora,
+              icon: Icons.eco,
+              isSelected: selCat == 'Flora',
+              activeColor: const Color(0xFF1E5E3A),
+              onTap: () => _onQuickChipTapped('Flora'),
+            ),
+            const SizedBox(width: 8),
+
+            // 3. Fauna
+            _buildQuickChip(
+              label: "Fauna",
+              count: _countFauna,
+              icon: Icons.pets,
+              isSelected: selCat == 'Fauna',
+              activeColor: const Color(0xFF9A6735),
+              onTap: () => _onQuickChipTapped('Fauna'),
+            ),
+            const SizedBox(width: 8),
+
+            // 4. Suelo
+            _buildQuickChip(
+              label: "Suelo",
+              count: _countSuelo,
+              icon: Icons.landscape,
+              isSelected: selCat == 'Suelo',
+              activeColor: const Color(0xFF8C5E48),
+              onTap: () => _onQuickChipTapped('Suelo'),
+            ),
+            const SizedBox(width: 8),
+
+            // 5. Agua
+            _buildQuickChip(
+              label: "Agua",
+              count: _countAgua,
+              icon: Icons.water_drop,
+              isSelected: selCat == 'Agua',
+              activeColor: const Color(0xFF2563EB),
+              onTap: () => _onQuickChipTapped('Agua'),
+            ),
+            const SizedBox(width: 8),
+
+            // 6. Aire
+            _buildQuickChip(
+              label: "Aire",
+              count: _countAire,
+              icon: Icons.air,
+              isSelected: selCat == 'Aire',
+              activeColor: const Color(0xFF0284C7),
+              onTap: () => _onQuickChipTapped('Aire'),
+            ),
+            const SizedBox(width: 8),
+
+            // 7. Botón desplegable / ajustes de filtros completos
+            InkWell(
+              onTap: _showFullFilterModal,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _filters.hasActiveFilters ? const Color(0xFF1E5E3A) : const Color(0xFFE5E7EB),
+                    width: _filters.hasActiveFilters ? 1.5 : 1.0,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x10000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.tune,
+                      size: 15,
+                      color: _filters.hasActiveFilters ? const Color(0xFF1E5E3A) : const Color(0xFF4B5563),
+                    ),
+                    const SizedBox(width: 3),
+                    const Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 16,
+                      color: Color(0xFF4B5563),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickChip({
+    required String label,
+    required int count,
+    required IconData? icon,
+    required bool isSelected,
+    required Color activeColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? activeColor : const Color(0xFFE5E7EB),
+              width: 1.1,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x10000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 14,
+                  color: isSelected ? Colors.white : activeColor,
+                ),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF374151),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withAlpha(50) : const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : const Color(0xFF4B5563),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // BOTONES FLOTANTES DE CONTROL (LADO DERECHO)
+  // ===========================================================================
+
+  Widget _buildFloatingControlButton({
+    required IconData icon,
+    required Color iconColor,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 3,
+      shadowColor: const Color(0x26000000),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Tooltip(
+          message: tooltip,
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // TARJETA DE UBICACIÓN ACTUAL FLOTANTE
+  // ===========================================================================
+
+  Widget _buildLocationCard() {
+    final latStr = _currentLocation != null
+        ? '${_currentLocation!.latitude.toStringAsFixed(4)}° N, ${_currentLocation!.longitude.toStringAsFixed(4)}° W'
+        : '3.9123° N, 76.6721° W';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 12,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () {
+          if (_currentLocation != null) {
+            _animatedMapMove(_currentLocation!, 16);
+          } else {
+            _getCurrentLocation();
+          }
+        },
+        borderRadius: BorderRadius.circular(18),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEFF6FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.radio_button_checked,
+                color: Color(0xFF2563EB),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Tu ubicación actual",
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "PNR Páramo del Duende · $latStr",
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF4B5563),
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF), size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // TARJETA FLOTANTE DE VISTA PREVIA (PRE-DETALLE AL SELECCIONAR UN PIN)
+  // ===========================================================================
+
+  Widget _buildSelectedReportCard(Map<String, dynamic> r) {
+    final catNombre = r['categoriaNombre'] ?? r['categoria']?['nombre'] ?? 'Flora';
+    final estadoNombre = r['estadoReporteNombre'] ?? r['estado']?['nombre'] ?? 'Validado';
+    final prioridadNombre = r['prioridadNombre'] ?? r['prioridad']?['nombre'] ?? 'Media';
+    final titulo = r['titulo']?.toString().isNotEmpty == true
+        ? r['titulo'].toString()
+        : 'Observación en el Páramo';
+    final sector = r['sector'] ?? r['ubicacionTexto'] ?? 'Sector Laguna Verde';
+    final fecha = _formatReportDate(r['fechaReporte'] ?? r['fechaCreacion']);
+
+    final String? imgUrl = _getObservationImageUrl(r);
+    final Uint8List? imgBytes = imgUrl == null ? _getObservationImage(r) : null;
+    final catColor = _getCategoryPinColor(catNombre);
+    final statusColor = _getStatusColor(estadoNombre);
+    final statusBgColor = _getStatusBgColor(estadoNombre);
+    final prioColor = _getPriorityColor(prioridadNombre);
+    final prioBgColor = _getPriorityBgColor(prioridadNombre);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: () => _navigateToReportDetail(r),
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 1. Izquierda: Imagen destacada cuadrada medianita 78x78
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 78,
+                    height: 78,
+                    child: imgUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: imgUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(color: Colors.grey[200]),
+                            errorWidget: (context, url, error) => Image.asset(
+                              _categoryAsset(catNombre),
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : (imgBytes != null
+                            ? Image.memory(
+                                imgBytes,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                              )
+                            : Image.asset(
+                                _categoryAsset(catNombre),
+                                fit: BoxFit.cover,
+                              )),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // 2. Centro (Expanded): Chips, Título, Fecha y Ubicación
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Fila superior de chips: Categoría, Estado y Prioridad
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            // Chip de Categoría
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.0),
+                              decoration: BoxDecoration(
+                                color: catColor.withAlpha(25),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: catColor.withAlpha(90), width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(_getCategoryIcon(catNombre), size: 10.5, color: catColor),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    catNombre,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: catColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+
+                            // Chip de Estado
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.0),
+                              decoration: BoxDecoration(
+                                color: statusBgColor,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: statusColor.withAlpha(90), width: 0.8),
+                              ),
+                              child: Text(
+                                estadoNombre,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+
+                            // Chip de Prioridad con indicador de color
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.0),
+                              decoration: BoxDecoration(
+                                color: prioBgColor,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: prioColor.withAlpha(90), width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: prioColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3.5),
+                                  Text(
+                                    prioridadNombre,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: prioColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+
+                      // Título del reporte en negrita
+                      Text(
+                        titulo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+
+                      // Fecha y hora con icono de calendario pequeño
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today_outlined,
+                            size: 12,
+                            color: Color(0xFF6B7280),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            fecha,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+
+                      // Ubicación con icono de pin pequeño
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.place_outlined,
+                            size: 13,
+                            color: Color(0xFF6B7280),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              sector,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF4B5563),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 3. Derecha: Botón superior (X) y Flechita hacia el detalle
+                SizedBox(
+                  height: 78,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Botón superior para cerrar (X) para deseleccionar el pin
+                      InkWell(
+                        onTap: () => setState(() => _selectedReporte = null),
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2.0),
+                          child: Icon(Icons.close, size: 18, color: Color(0xFF9CA3AF)),
+                        ),
+                      ),
+                      // Flecha hacia la derecha como indicador visual de navegación
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 24,
+                        color: Color(0xFF374151),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // PANEL INFERIOR DE ACCIONES RÁPIDAS (CON ARRASTRE Y COLAPSO)
+  // ===========================================================================
+
+  Widget _buildQuickActionPanel() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAF9),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 16,
+            offset: Offset(0, -3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Barra de arrastre (drag handle) para expandir o contraer
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragEnd: (details) {
+              if (details.primaryVelocity != null) {
+                if (details.primaryVelocity! > 200) {
+                  setState(() => _isQuickActionsExpanded = false);
+                } else if (details.primaryVelocity! < -200) {
+                  setState(() => _isQuickActionsExpanded = true);
+                }
+              }
+            },
+            onTap: () {
+              setState(() => _isQuickActionsExpanded = !_isQuickActionsExpanded);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              width: double.infinity,
+              child: Column(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 4.5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  if (!_isQuickActionsExpanded) ...[
+                    const SizedBox(height: 5),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.keyboard_arrow_up, size: 16, color: Color(0xFF1E5E3A)),
+                        SizedBox(width: 4),
+                        Text(
+                          "Accesos rápidos de reporte",
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E5E3A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          // Contenido de botones rápidos (visible solo si está expandido)
+          if (_isQuickActionsExpanded)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    _buildQuickActionCard(
+                      title: "Reportar\nFlora",
+                      icon: Icons.eco,
+                      iconColor: const Color(0xFF1E5E3A),
+                      circleColor: const Color(0xFFE8F5E9),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ObservationFormScreen(
+                              location: _currentLocation ?? _defaultCenter,
+                              category: 'Flora',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _buildQuickActionCard(
+                      title: "Reportar\nAvistamiento",
+                      icon: Icons.pets,
+                      iconColor: const Color(0xFF9A6735),
+                      circleColor: const Color(0xFFFEF3C7),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ObservationFormScreen(
+                              location: _currentLocation ?? _defaultCenter,
+                              category: 'Fauna',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _buildQuickActionCard(
+                      title: "Reportar Aire\n/ Clima",
+                      icon: Icons.air,
+                      iconColor: const Color(0xFF0284C7),
+                      circleColor: const Color(0xFFE0F2FE),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ObservationFormScreen(
+                              location: _currentLocation ?? _defaultCenter,
+                              category: 'Aire',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _buildQuickActionCard(
+                      title: "Suelo /\nAgua",
+                      icon: Icons.landscape,
+                      iconColor: const Color(0xFF8C5E48),
+                      circleColor: const Color(0xFFF3E8FF),
+                      onTap: _showSueloAguaSelector,
+                    ),
+                    const SizedBox(width: 10),
+                    _buildQuickActionCard(
+                      title: "Mis\nReportes",
+                      icon: Icons.description_outlined,
+                      iconColor: const Color(0xFF0D9488),
+                      circleColor: const Color(0xFFE6F4EA),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MyObservationsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required Color circleColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 1.5,
+      shadowColor: const Color(0x14000000),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 90,
+          height: 88,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: circleColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F2937),
+                  height: 1.15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // MARCADOR DE USUARIO Y PINES TEMÁTICOS PERSONALIZADOS
+  // ===========================================================================
+
+  Marker _buildUserLocationMarker() {
+    return Marker(
+      point: _currentLocation!,
+      width: 60,
+      height: 60,
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x332563EB),
+              ),
+            ),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0x4D2563EB),
+                border: Border.all(color: const Color(0x662563EB), width: 1.5),
+              ),
+            ),
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF2563EB),
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x4D000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMarkerPin({
+    required Color color,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          if (isSelected)
+            Positioned(
+              top: -6,
+              child: Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withAlpha(50),
+                  border: Border.all(color: color.withAlpha(160), width: 2),
+                ),
+              ),
+            ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: isSelected ? 40 : 36,
+                height: isSelected ? 40 : 36,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white,
+                    width: isSelected ? 2.8 : 2.2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x4D000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: isSelected ? 21 : 19,
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(0, -3),
+                child: CustomPaint(
+                  size: Size(isSelected ? 12 : 10, isSelected ? 7 : 6),
+                  painter: _PinTrianglePainter(color),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 1. Capa de Mapa Satelital / Relieve
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentLocation ?? _defaultCenter,
+              initialZoom: 14,
+              onTap: (_, _) {
+                if (_selectedReporte != null) {
+                  setState(() => _selectedReporte = null);
+                }
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: _getTileUrl(),
+                userAgentPackageName: 'com.example.app_tesis',
+              ),
+              MarkerLayer(
+                markers: [
+                  ..._filteredReportes.map((r) {
+                    final cat = (r['categoriaNombre'] ?? '').toString();
+                    final icon = _getCategoryIcon(cat);
+                    final pinColor = _getCategoryPinColor(cat);
+                    final isSelected = _selectedReporte != null &&
+                        ((_selectedReporte!['id'] != null && _selectedReporte!['id'] == r['id']) ||
+                            (_selectedReporte == r));
+
+                    return Marker(
+                      point: LatLng(
+                        (r['latitud'] as num).toDouble(),
+                        (r['longitud'] as num).toDouble(),
+                      ),
+                      width: 56,
+                      height: 60,
+                      child: _buildMarkerPin(
+                        color: pinColor,
+                        icon: icon,
+                        isSelected: isSelected,
+                        onTap: () => _onMarkerTapped(Map<String, dynamic>.from(r)),
+                      ),
+                    );
+                  }),
+                  if (_currentLocation != null) _buildUserLocationMarker(),
+                ],
+              ),
+            ],
+          ),
+
+          // 2. Indicador de carga flotante
+          if (_isLoading)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 175,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x1F000000), blurRadius: 8, offset: Offset(0, 2)),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1E5E3A)),
+                      ),
+                      SizedBox(width: 8),
+                      Text('Cargando mapa...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // 3. Header flotante + Barra de búsqueda + Chips de Categorías rápidas
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 4),
+                  _buildSearchBar(),
+                  _buildQuickCategoryChips(),
+                ],
+              ),
+            ),
+          ),
+
+          // 4. Botones flotantes de control (lado derecho)
+          Positioned(
+            right: 16,
+            bottom: _selectedReporte != null
+                ? 135
+                : (_isQuickActionsExpanded ? 230 : 65),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildFloatingControlButton(
+                  icon: Icons.my_location,
+                  iconColor: const Color(0xFF2563EB),
+                  tooltip: "Mi ubicación",
+                  onTap: () {
+                    if (_currentLocation != null) {
+                      _animatedMapMove(_currentLocation!, 16);
+                    } else {
+                      _getCurrentLocation();
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                _buildFloatingControlButton(
+                  icon: Icons.layers_outlined,
+                  iconColor: const Color(0xFF1E5E3A),
+                  tooltip: "Capas de mapa",
+                  onTap: _showLayersModal,
+                ),
+                const SizedBox(height: 10),
+                _buildFloatingControlButton(
+                  icon: Icons.near_me_outlined,
+                  iconColor: const Color(0xFF0F3A22),
+                  tooltip: "Orientación norte",
+                  onTap: () => _mapController.rotate(0),
+                ),
+              ],
+            ),
+          ),
+
+          // 5. Tarjeta de Preview de Reporte (al seleccionar un pin) O Panel de Accesos Rápidos
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_selectedReporte != null)
+                  _buildSelectedReportCard(_selectedReporte!)
+                else ...[
+                  if (_isQuickActionsExpanded) _buildLocationCard(),
+                  _buildQuickActionPanel(),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PinTrianglePainter extends CustomPainter {
+  final Color color;
+  const _PinTrianglePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PinTrianglePainter oldDelegate) =>
+      oldDelegate.color != color;
+}

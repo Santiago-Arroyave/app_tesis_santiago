@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 
@@ -16,12 +17,12 @@ class ObservationEditScreen extends StatefulWidget {
 }
 
 class _ObservationEditScreenState extends State<ObservationEditScreen> {
-  static const _baseUrl = '${ApiConfig.baseUrl}';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   late TextEditingController _tituloController;
   late TextEditingController _descController;
   List<Map<String, dynamic>> _existingPhotos = [];
-  List<File> _newPhotos = [];
+  final List<File> _newPhotos = [];
   bool _saving = false;
   String? _errorMessage;
 
@@ -538,15 +539,30 @@ class _ObservationEditScreenState extends State<ObservationEditScreen> {
                   itemCount: _existingPhotos.length,
                   itemBuilder: (_, i) {
                     final ev = _existingPhotos[i];
+                    final urlArchivo = ev['urlArchivo']?.toString() ??
+                        ev['archivoUrl']?.toString() ??
+                        ev['url']?.toString() ??
+                        '';
                     final base64Str = ev['archivoBase64']?.toString() ?? '';
-                    final urlArchivo = ev['urlArchivo']?.toString() ?? '';
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: base64Str.isNotEmpty
-                          ? Image.memory(
-                              base64Decode(base64Str),
+                      child: urlArchivo.isNotEmpty &&
+                              (urlArchivo.startsWith('http://') ||
+                                  urlArchivo.startsWith('https://'))
+                          ? CachedNetworkImage(
+                              imageUrl: urlArchivo,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey.shade200,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 color: Colors.grey.shade200,
                                 child: Icon(
                                   Icons.broken_image,
@@ -554,25 +570,25 @@ class _ObservationEditScreenState extends State<ObservationEditScreen> {
                                 ),
                               ),
                             )
-                          : urlArchivo.isNotEmpty
-                          ? Image.network(
-                              urlArchivo,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey.shade200,
-                                child: Icon(
-                                  Icons.broken_image,
-                                  color: Colors.grey.shade400,
+                          : base64Str.isNotEmpty
+                              ? Image.memory(
+                                  base64Decode(base64Str),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: Colors.grey.shade200,
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: Colors.grey.shade400,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : Container(
-                              color: Colors.grey.shade200,
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: Colors.grey.shade400,
-                              ),
-                            ),
                     );
                   },
                 ),

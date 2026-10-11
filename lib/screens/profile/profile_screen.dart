@@ -1,16 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:goblink_park/screens/profile/edit_profile_screen.dart';
-import 'package:goblink_park/screens/profile/notifications_screen.dart';
-import 'package:goblink_park/screens/login_screen/login_screen.dart';
-
 import 'dart:convert';
-import 'dart:io';
-//import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
-import 'package:goblink_park/screens/login_screen/auth_service.dart';
-//import 'package:goblink_park/screens/login_screen/login_screen.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/login_screen/login_screen.dart';
+import 'package:goblink_park/screens/profile/notification_settings_screen.dart';
+import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:goblink_park/screens/profile/permissions_screen.dart';
+import 'package:goblink_park/screens/profile/security_screen.dart';
+import 'package:goblink_park/screens/profile/user_profile_view_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,11 +19,13 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  static const _baseUrl = '${ApiConfig.baseUrl}';
-
   Map<String, dynamic>? _usuario;
+  Map<String, dynamic> _estadisticas = {
+    'totalProyectos': 0,
+    'totalReportes': 0,
+    'totalEvidencias': 0,
+  };
   bool _isLoading = true;
-  String? _errorMessage;
 
   @override
   void initState() {
@@ -32,1226 +33,767 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
-  // ── Cargar perfil ──────────────────────────────────────────
-
   Future<void> _loadProfile() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final localData = await AuthService.getUserData();
-
-      if (!mounted) return;
-
-      if (localData != null) {
-        setState(() {
-          _usuario = localData;
-          _isLoading = false;
-        });
-
-        debugPrint('PERFIL CARGADO DESDE DATOS LOCALES');
-        debugPrint('USUARIO: $localData');
-      } else {
-        setState(() {
-          _errorMessage = 'No se encontraron datos del usuario';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _errorMessage = 'Error al cargar perfil: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  /*Future<void> _loadProfile() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final token = await AuthService.getToken();
+      Map<String, dynamic>? data = await AuthService.getUserData();
 
-      if (token == null || token.isEmpty) {
-        setState(() {
-          _errorMessage = 'No se encontró la sesión del usuario';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/usuarios/perfil'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      debugPrint('GET PERFIL');
-      debugPrint('STATUS: ${response.statusCode}');
-      debugPrint('BODY: ${response.body}');
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        // Actualizar los datos guardados localmente
-        await AuthService.saveUserData(data);
-
-        if (!mounted) return;
-
-        setState(() {
-          _usuario = data;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Error al cargar perfil (${response.statusCode})';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _errorMessage = 'Error de conexión: $e';
-        _isLoading = false;
-      });
-    }
-  }*/
-
-  /*Future<void> _loadProfile() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      final token = await AuthService.getToken();
-      final id = await AuthService.getUserId();
-
-      if (id == null) {
-        final localData = await AuthService.getUserData();
-        if (localData != null) {
-          setState(() {
-            _usuario = localData;
-            _isLoading = false;
-          });
-          return;
-        }
-        setState(() {
-          _errorMessage = 'No se encontró el ID del usuario';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/usuarios/$id'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        await AuthService.saveUserData(data);
-        setState(() {
-          _usuario = data;
-          _isLoading = false;
-        });
-      } else {
-        // 403 u otro error → usar datos guardados del login
-        final localData = await AuthService.getUserData();
-        if (localData != null) {
-          setState(() {
-            _usuario = localData;
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _errorMessage = 'Error al cargar perfil';
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      final localData = await AuthService.getUserData();
-      if (localData != null && mounted) {
-        setState(() {
-          _usuario = localData;
-          _isLoading = false;
-        });
-      } else if (mounted) {
-        setState(() {
-          _errorMessage = 'Error de conexión: $e';
-          _isLoading = false;
-        });
-      }
-    }
-  }*/
-
-  Widget _buildAvatar() {
-    final foto = _usuario?['fotoPerfil'];
-
-    if (foto == null || foto.toString().trim().isEmpty) {
-      return Icon(Icons.person, size: 50, color: Colors.grey.shade600);
-    }
-
-    try {
-      final texto = foto.toString();
-
-      // URL
-      if (texto.startsWith('http')) {
-        return ClipOval(
-          child: Image.network(
-            texto,
-            width: 100,
-            height: 100,
-            fit: BoxFit.cover,
-          ),
-        );
-      }
-
-      // Base64 con encabezado
-      if (texto.startsWith('data:image')) {
-        final bytes = base64Decode(texto.split(',').last);
-
-        return ClipOval(
-          child: Image.memory(
-            bytes,
-            width: 100,
-            height: 100,
-            fit: BoxFit.cover,
-          ),
-        );
-      }
-
-      // Base64 puro (el que devuelve tu backend)
-      final bytes = base64Decode(texto);
-
-      return ClipOval(
-        child: Image.memory(bytes, width: 100, height: 100, fit: BoxFit.cover),
-      );
-    } catch (_) {
-      return Icon(Icons.person, size: 50, color: Colors.grey.shade600);
-    }
-  }
-
-  /*Widget _buildAvatar() {
-    final foto = _usuario?['fotoPerfil'];
-
-    // Sin foto → ícono por defecto
-    if (foto == null || foto.toString().isEmpty) {
-      return Icon(Icons.person, size: 50, color: Colors.grey.shade600);
-    }
-
-    // Base64
-    if (foto.toString().startsWith('data:image')) {
-      try {
-        final base64Str = foto.toString().split(',').last;
-        final bytes = base64Decode(base64Str);
-        return ClipOval(
-          child: Image.memory(
-            bytes,
-            width: 100,
-            height: 100,
-            fit: BoxFit.cover,
-          ),
-        );
-      } catch (e) {
-        return Icon(Icons.person, size: 50, color: Colors.grey.shade600);
-      }
-    }
-
-    // URL normal
-    if (foto.toString().startsWith('http')) {
-      return ClipOval(
-        child: Image.network(
-          foto,
-          width: 100,
-          height: 100,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              Icon(Icons.person, size: 50, color: Colors.grey.shade600),
-        ),
-      );
-    }
-
-    // Cualquier otro caso
-    return Icon(Icons.person, size: 50, color: Colors.grey.shade600);
-  }*/
-
-  /*Future<void> _loadProfile() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      final token = await AuthService.getToken();
-      final id = await AuthService.getUserId();
-      if (id == null) {
-        setState(() {
-          _errorMessage = 'No se encontró el ID del usuario';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/usuarios/$id'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      debugPrint('ID: $id');
-      debugPrint('TOKEN: $token');
-      debugPrint('STATUS: ${response.statusCode}');
-      debugPrint('BODY: ${response.body}');
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _usuario = jsonDecode(response.body);
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Error al cargar perfil';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Error de conexión: $e';
-          _isLoading = false;
-        });
-      }
-    }
-  }*/
-
-  // ── Editar nombre ──────────────────────────────────────────
-  Future<void> _editName() async {
-    final controller = TextEditingController(text: _usuario?['nombres'] ?? '');
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Escribe tu nombre'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color.fromARGB(255, 7, 83, 11),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    // Guardar solo localmente
-    final nuevoNombre = controller.text.trim();
-    if (nuevoNombre.isEmpty) return;
-
-    /*setState(() {
-      _usuario = {..._usuario!, 'nombres': nuevoNombre};
-    });
-
-    // Actualizar datos locales guardados
-    await AuthService.saveUserData(_usuario!);*/
-    await _updateUser(nombres: nuevoNombre);
-
-    /*if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nombre actualizado'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }*/
-  }
-  /*Future<void> _editName() async {
-    final controller = TextEditingController(text: _usuario?['nombres'] ?? '');
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Escribe tu nombre'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[800],
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-    await _updateUser(nombres: controller.text.trim());
-  }*/
-
-  // ── Editar foto ────────────────────────────────────────────
-  Future<void> _editPhoto() async {
-    final source = await showModalBottomSheet<String>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(
-                Icons.camera_alt,
-                color: Color.fromARGB(255, 7, 83, 11),
-              ),
-              title: const Text('Cámara'),
-              onTap: () => Navigator.pop(ctx, 'camera'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.blue),
-              title: const Text('Galería'),
-              onTap: () => Navigator.pop(ctx, 'gallery'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (source == null || !mounted) return;
-
-    final picked = await ImagePicker().pickImage(
-      source: source == 'camera' ? ImageSource.camera : ImageSource.gallery,
-      imageQuality: 80,
-    );
-
-    if (picked == null || !mounted) return;
-
-    // Convertir a Base64
-    final file = File(picked.path);
-
-    await _updateUser(foto: file);
-  }
-
-  // ── Eliminar foto ──────────────────────────────────────────
-  /*Future<void> _deletePhoto() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_rounded, color: Colors.red.shade600, size: 56),
-            const SizedBox(height: 12),
-            const Text(
-              '¿Quieres eliminar esta imagen?',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Sí, eliminar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-    await _updateUser(fotoPerfil: '');
-  }*/
-
-  // ── Actualizar usuario PUT /api/usuarios/{id} ──────────────
-  Future<void> _updateUser({String? nombres, File? foto}) async {
-    try {
-      final token = await AuthService.getToken();
-
-      var request = http.MultipartRequest(
-        "PUT",
-        Uri.parse("$_baseUrl/api/usuarios/perfil"),
-      );
-
-      request.headers["Authorization"] = "Bearer $token";
-
-      request.fields["nombres"] = nombres ?? (_usuario?["nombres"] ?? "");
-
-      request.fields["username"] = _usuario?["username"] ?? "";
-
-      request.fields["telefono"] = _usuario?["telefono"] ?? "";
-
-      if (foto != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath("fotoPerfil", foto.path),
-        );
-      }
-
-      /*final response = await request.send();
-
-      if (response.statusCode == 200) {
-        await _loadProfile();
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Perfil actualizado"),
-            backgroundColor: Color.fromARGB(255, 7, 83, 11),
-          ),
-        );
-      }*/
-      final response = await request.send();
-
-      if (response.statusCode == 200) {
-        final responseBody = await response.stream.bytesToString();
-
-        debugPrint('RESPUESTA ACTUALIZAR PERFIL: $responseBody');
-
+      // Consumir datos reales de la BD vía GET /api/usuarios/perfil
+      if (token != null && token.isNotEmpty) {
         try {
-          final data = jsonDecode(responseBody);
+          final perfilRes = await http.get(
+            Uri.parse('${ApiConfig.baseUrl}/api/usuarios/perfil'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          ).timeout(const Duration(seconds: 10));
 
-          // Actualizar inmediatamente los datos mostrados
-          await AuthService.saveUserData(data);
-
-          if (!mounted) return;
-
-          setState(() {
-            _usuario = data;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Perfil actualizado"),
-              backgroundColor: Color.fromARGB(255, 7, 83, 11),
-            ),
-          );
+          if (perfilRes.statusCode == 200) {
+            final decoded = jsonDecode(perfilRes.body);
+            if (decoded is Map<String, dynamic>) {
+              data = decoded;
+              await AuthService.saveUserData(decoded);
+            }
+          }
         } catch (e) {
-          debugPrint('Error procesando respuesta del perfil: $e');
-
-          if (!mounted) return;
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Perfil actualizado"),
-              backgroundColor: Color.fromARGB(255, 7, 83, 11),
-            ),
-          );
+          debugPrint('Error al obtener perfil desde API: $e');
         }
-      } else {
-        if (!mounted) return;
-
-        final body = await response.stream.bytesToString();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(body), backgroundColor: Colors.red),
-        );
       }
-    } catch (e) {
-      if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
-  }
-
-  /*Future<void> _updateUser({String? nombres, String? fotoPerfil}) async {
-    try {
-      final token = await AuthService.getToken();
-      final id = await AuthService.getUserId();
-
-      final body = {
-        'nombres': nombres ?? _usuario?['nombres'],
-        'correo': _usuario?['correo'],
-        'username': _usuario?['username'],
-        'telefono': _usuario?['telefono'],
-        'fotoPerfil': fotoPerfil ?? _usuario?['fotoPerfil'],
-        'estado': _usuario?['estado'] ?? true,
-        'rolId': _usuario?['rolId'] ?? 1,
+      Map<String, dynamic> stats = {
+        'totalProyectos': 0,
+        'totalReportes': 0,
+        'totalEvidencias': 0,
       };
 
-      final response = await http.put(
-        Uri.parse('$_baseUrl/api/usuarios/$id'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(body),
-      );
+      final userId = data?['id'] ?? await AuthService.getUserId();
 
-      debugPrint('PUT usuario: $id');
-      debugPrint('STATUS PUT: ${response.statusCode}');
-      debugPrint('BODY PUT: ${response.body}');
+      if (userId != null && token != null && token.isNotEmpty) {
+        try {
+          final res = await http.get(
+            Uri.parse('${ApiConfig.baseUrl}/api/usuarios/$userId/estadisticas'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          ).timeout(const Duration(seconds: 10));
+
+          if (res.statusCode == 200) {
+            final decoded = jsonDecode(res.body);
+            if (decoded is Map<String, dynamic>) {
+              stats = decoded;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error al obtener estadísticas del usuario: $e');
+        }
+      }
 
       if (!mounted) return;
+      setState(() {
+        _usuario = data;
+        _estadisticas = stats;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
 
-      if (response.statusCode == 200) {
-        await _loadProfile();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Perfil actualizado'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        final data = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message'] ?? 'Error al actualizar'),
-            backgroundColor: Colors.red,
+  Widget _buildAvatar() {
+    final rawFoto = _usuario?['fotoPerfil']?.toString();
+
+    if (rawFoto != null && rawFoto.trim().isNotEmpty) {
+      if (rawFoto.startsWith('http://') || rawFoto.startsWith('https://')) {
+        return ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: rawFoto,
+            width: 72,
+            height: 72,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              width: 72,
+              height: 72,
+              color: Colors.grey[200],
+            ),
+            errorWidget: (context, url, error) => _defaultAvatar(),
           ),
         );
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      try {
+        String clean = rawFoto;
+        if (clean.contains(',')) {
+          clean = clean.split(',').last;
+        }
+        final bytes = base64Decode(clean);
+        return ClipOval(
+          child: Image.memory(
+            bytes,
+            width: 72,
+            height: 72,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => _defaultAvatar(),
+          ),
+        );
+      } catch (_) {
+        return _defaultAvatar();
       }
     }
-  }*/
 
-  // ── Cerrar sesión ──────────────────────────────────────────
-  Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
+    return _defaultAvatar();
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: const BoxDecoration(
+        color: Color(0xFFE8F5E9),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        Icons.person,
+        size: 42,
+        color: Color(0xFF1E5E3A),
+      ),
+    );
+  }
+
+  Future<void> _navigateToUserProfileView() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserProfileViewScreen(
+          usuario: _usuario,
+          estadisticas: _estadisticas,
+        ),
+      ),
+    );
+    if (mounted) {
+      _loadProfile();
+    }
+  }
+
+  // ===========================================================================
+  // SOPORTE Y CIERRE DE SESIÓN
+  // ===========================================================================
+
+  void _showHelpSupportModal() {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.logout, color: Colors.red.shade600, size: 48),
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(Icons.help_outline_rounded, color: Color(0xFF1E5E3A), size: 22),
+                SizedBox(width: 8),
+                Text(
+                  "Ayuda y Soporte Institucional",
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F3A22),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             const Text(
-              '¿Quieres cerrar sesión?',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+              "PNR Páramo del Duende - Plataforma GoblinPark",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF111827)),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              "Para asistencia técnica en campo, reporte de anomalías o dudas sobre protocolos de monitoreo, comunícate con nuestro equipo:",
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF4B5563)),
+            ),
+            const SizedBox(height: 14),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFEFF6FF),
+                child: Icon(Icons.mail_outline, color: Color(0xFF2563EB)),
+              ),
+              title: const Text("soporte@goblinpark.gov.co", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text("Atención técnica y científica 24/7", style: TextStyle(fontSize: 11.5)),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE8F5E9),
+                child: Icon(Icons.phone_outlined, color: Color(0xFF1E5E3A)),
+              ),
+              title: const Text("+57 (602) 224-5500", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text("Línea de emergencia Guardabosques", style: TextStyle(fontSize: 11.5)),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E5E3A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Cerrar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-              foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  // Diálogo modal de confirmación de cierre de sesión en BottomSheet
+  Future<void> _showLogoutDialog() async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
             ),
-            child: const Text('Cerrar sesión'),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFEBEE),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFD32F2F),
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "¿Cerrar sesión?",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Tendrás que volver a ingresar tus credenciales para acceder a tus reportes y mapas.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 46,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        side: const BorderSide(color: Color(0xFFE5E7EB)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        "Cancelar",
+                        style: TextStyle(
+                          color: Color(0xFF374151),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD32F2F),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        "Sí, cerrar sesión",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
 
-    if (confirmed != true || !mounted) return;
-
-    await AuthService.deleteToken();
-    await AuthService.deleteUserId();
-    await AuthService.deleteUserData();
-
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    if (confirmed == true && mounted) {
+      await AuthService.logout();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final nombres = _usuario?['nombres']?.toString() ?? '';
+    final apellidos = _usuario?['apellidos']?.toString() ?? '';
+    final fullName = '$nombres $apellidos'.trim();
+    final nombreCompleto = _usuario?['nombreCompleto']?.toString() ??
+        (fullName.isNotEmpty ? fullName : (_usuario?['username']?.toString() ?? 'Usuario GoblinPark'));
+    final cargo = (_usuario?['cargoRol'] ??
+            _usuario?['cargo_rol'] ??
+            _usuario?['cargo'] ??
+            _usuario?['rolNombre'] ??
+            _usuario?['rol'])
+        ?.toString() ??
+        'Guardabosques';
+    final entidad = _usuario?['entidad']?.toString() ?? 'Parques Nacionales Naturales';
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.wifi_off, size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  Text(_errorMessage!),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _loadProfile,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            )
-          : SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
-
-                  // ── Avatar ───────────────────────────
-                  Stack(
-                    alignment: Alignment.bottomRight,
+      backgroundColor: const Color(0xFFF9FAFB),
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF1E5E3A),
+                  strokeWidth: 2.5,
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: _loadProfile,
+                color: const Color(0xFF1E5E3A),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      GestureDetector(
-                        onTap: _editPhoto,
+                      // 1. Header Superior Institucional
+                      _buildInstitutionalHeader(),
+                      const SizedBox(height: 16),
 
-                        child: CircleAvatar(
-                          radius: 50,
-
-                          backgroundColor: Colors.grey.shade300,
-
-                          child: _buildAvatar(),
+                      // 2. Título de vista: "Mi información"
+                      const Text(
+                        "Mi información",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F3A22),
+                          letterSpacing: -0.4,
                         ),
                       ),
-                      Positioned(
-                        bottom: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: _editPhoto,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              size: 14,
-                              color: Colors.black54,
-                            ),
-                          ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        "Gestiona tu perfil, seguridad y preferencias de la cuenta",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF4B5563),
                         ),
                       ),
-                      /* Positioned(
-                        bottom: 4,
-                        right: 4,
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 14,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ),*/
+                      const SizedBox(height: 16),
+
+                      // 3. Tarjeta de usuario destacada (Avatar & Resumen)
+                      _buildUserSummaryCard(
+                        nombreCompleto: nombreCompleto,
+                        cargo: cargo,
+                        entidad: entidad,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 4. Métricas de participación del usuario
+                      _buildMetricsRow(),
+                      const SizedBox(height: 20),
+
+                      // 5. Lista de opciones de gestión
+                      _buildOptionsSection(),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                ),
+              ),
+      ),
+    );
+  }
 
-                  // ── Nombre debajo del avatar ──────────
-                  Text(
-                    _usuario?['nombres'] ?? 'Sin nombre',
-                    style: const TextStyle(
-                      fontSize: 16,
+  // ===========================================================================
+  // COMPONENTES VISUALES
+  // ===========================================================================
+
+  Widget _buildInstitutionalHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipOval(
+            child: Image.asset(
+              'assets/images/Logo verde.png',
+              width: 38,
+              height: 38,
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Monitoreo Duende",
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F3A22),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  "PNR Páramo del Duende",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF2E4F3E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 25),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  );
+                },
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4.5),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1E5E3A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text(
+                    '3',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-                  // ── Lista de opciones ────────────────
-                  Expanded(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(24),
-                        ),
-                      ),
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        children: [
-                          // Nombre editable
-                          _ProfileTile(
-                            icon: Icons.person_outline,
-                            title: 'Nombre',
-                            subtitle: _usuario?['nombres'] ?? 'Sin nombre',
-                            onTap: _editName,
-                          ),
-                          const Divider(),
+  Widget _buildUserSummaryCard({
+    required String nombreCompleto,
+    required String cargo,
+    required String entidad,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C000000),
+            blurRadius: 12,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: _navigateToUserProfileView,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                // Avatar circular con borde verde institucional
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF1E5E3A), width: 2.2),
+                  ),
+                  child: _buildAvatar(),
+                ),
+                const SizedBox(width: 14),
 
-                          // Notificaciones
-                          _ProfileTile(
-                            icon: Icons.notifications_none,
-                            title: 'Notificaciones',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const NotificationsScreen(),
+                // Textos informativos
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Badge Usuario activo
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.circle, color: Color(0xFF15803D), size: 7),
+                            SizedBox(width: 4),
+                            Text(
+                              "Usuario activo",
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF15803D),
                               ),
                             ),
-                          ),
-                          /*_ProfileTile(
-                            icon: Icons.notifications_none,
-                            title: 'Notificaciones',
-                            onTap: () {},
-                          ),
-                          const Divider(),*/
-
-                          // Cerrar sesión
-                          _ProfileTile(
-                            icon: Icons.logout,
-                            title: 'Cerrar sesión',
-                            iconColor: Colors.red.shade600,
-                            textColor: Colors.red.shade600,
-                            onTap: _logout,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 5),
+
+                      // Nombre
+                      Text(
+                        nombreCompleto,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+
+                      // Cargo / Rol
+                      Text(
+                        cargo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E5E3A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+
+                      // Entidad
+                      Text(
+                        entidad,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF9CA3AF),
+                  size: 24,
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 
-  /*@override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.wifi_off, size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  Text(_errorMessage!),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _loadProfile,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
-                  ),
-                ],
+  Widget _buildMetricsRow() {
+    final int proyectos = (_estadisticas['totalProyectos'] as num?)?.toInt() ?? 0;
+    final int reportes = (_estadisticas['totalReportes'] as num?)?.toInt() ?? 0;
+    final int evidencias = (_estadisticas['totalEvidencias'] as num?)?.toInt() ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEBF3EE),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD1E3D7), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Mi participación en el proyecto",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F3A22),
+                ),
               ),
-            )
-          : SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
-
-                  // ── Avatar ───────────────────────────
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey.shade300,
-                        child: _buildAvatar(),
-                      ),
-                      /*CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey.shade300,
-                        backgroundImage:
-                            _usuario?['fotoPerfil'] != null &&
-                                _usuario!['fotoPerfil'].toString().isNotEmpty
-                            ? NetworkImage(_usuario!['fotoPerfil'])
-                            : null,
-                        child:
-                            _usuario?['fotoPerfil'] == null ||
-                                _usuario!['fotoPerfil'].toString().isEmpty
-                            ? Icon(
-                                Icons.person,
-                                size: 50,
-                                color: Colors.grey.shade600,
-                              )
-                            : null,
-                      ),*/
-                      // Punto verde online
-                      Positioned(
-                        bottom: 4,
-                        right: 4,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                        ),
-                      ),
-                    ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6EBE0),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  "En tiempo real",
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E5E3A),
                   ),
-                  const SizedBox(height: 12),
-
-                  // ── Nombre debajo del avatar ──────────
-                  Text(
-                    _usuario?['nombres'] ?? 'Sin nombre',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _usuario?['correo'] ?? '',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ── Lista de opciones ────────────────
-                  Expanded(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(24),
-                        ),
-                      ),
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        children: [
-                          // Nombre
-                          _ProfileTile(
-                            icon: Icons.person_outline,
-                            title: 'Nombre',
-                            subtitle: _usuario?['nombres'] ?? 'Sin nombre',
-                            onTap: () {},
-                          ),
-                          const Divider(),
-
-                          // Correo
-                          _ProfileTile(
-                            icon: Icons.email_outlined,
-                            title: 'Correo',
-                            subtitle: _usuario?['correo'] ?? 'Sin correo',
-                            onTap: () {},
-                          ),
-                          const Divider(),
-
-                          // Rol
-                          _ProfileTile(
-                            icon: Icons.badge_outlined,
-                            title: 'Rol',
-                            subtitle: _usuario?['rol'] ?? 'USER',
-                            onTap: () {},
-                          ),
-                          const Divider(),
-
-                          // Notificaciones
-                          _ProfileTile(
-                            icon: Icons.notifications_none,
-                            title: 'Notificaciones',
-                            onTap: () {},
-                          ),
-                          const Divider(),
-
-                          // Cerrar sesión
-                          _ProfileTile(
-                            icon: Icons.logout,
-                            title: 'Cerrar sesión',
-                            iconColor: Colors.red.shade600,
-                            textColor: Colors.red.shade600,
-                            onTap: _logout,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-    );
-  }*/
-
-  /* @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.wifi_off, size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  Text(_errorMessage!),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _loadProfile,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            )
-          : SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
-
-                  // ── Avatar ───────────────────────────
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      GestureDetector(
-                        onTap: _editPhoto,
-                        child: CircleAvatar(
-                          radius: 50,
-                          backgroundColor: Colors.grey.shade300,
-                          backgroundImage:
-                              _usuario?['fotoPerfil'] != null &&
-                                  _usuario!['fotoPerfil'].toString().isNotEmpty
-                              ? NetworkImage(_usuario!['fotoPerfil'])
-                              : null,
-                          child:
-                              _usuario?['fotoPerfil'] == null ||
-                                  _usuario!['fotoPerfil'].toString().isEmpty
-                              ? Icon(
-                                  Icons.person,
-                                  size: 50,
-                                  color: Colors.grey.shade600,
-                                )
-                              : null,
-                        ),
-                      ),
-                      // Botón eliminar foto
-                      if (_usuario?['fotoPerfil'] != null &&
-                          _usuario!['fotoPerfil'].toString().isNotEmpty)
-                        GestureDetector(
-                          onTap: _deletePhoto,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade600,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Indicador online
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // ── Lista de opciones ────────────────
-                  Expanded(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(24),
-                        ),
-                      ),
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        children: [
-                          // Nombre
-                          _ProfileTile(
-                            icon: Icons.person_outline,
-                            title: 'Nombre',
-                            subtitle: _usuario?['nombres'] ?? 'Sin nombre',
-                            onTap: _editName,
-                          ),
-                          const Divider(),
-
-                          // Notificaciones
-                          _ProfileTile(
-                            icon: Icons.notifications_none,
-                            title: 'Notificaciones',
-                            onTap: () {},
-                          ),
-                          const Divider(),
-
-                          // Cerrar sesión
-                          _ProfileTile(
-                            icon: Icons.logout,
-                            title: 'Cerrar sesión',
-                            iconColor: Colors.red.shade600,
-                            textColor: Colors.red.shade600,
-                            onTap: _logout,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-    );
-  }*/
-}
-
-// ─── Tile de perfil ──────────────────────────────────────────────────────────
-
-class _ProfileTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final VoidCallback onTap;
-  final Color? iconColor;
-  final Color? textColor;
-
-  const _ProfileTile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    this.subtitle,
-    this.iconColor,
-    this.textColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: iconColor ?? Colors.grey.shade700),
-      title: Text(title, style: TextStyle(color: textColor ?? Colors.black87)),
-      subtitle: subtitle != null ? Text(subtitle!) : null,
-      trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
-      onTap: onTap,
-      contentPadding: EdgeInsets.zero,
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildMetricItem(Icons.folder_outlined, proyectos.toString(), "Proyectos"),
+              const SizedBox(width: 8),
+              _buildMetricItem(Icons.assignment_outlined, reportes.toString(), "Reportes"),
+              const SizedBox(width: 8),
+              _buildMetricItem(Icons.photo_camera_outlined, evidencias.toString(), "Evidencias"),
+            ],
+          ),
+        ],
+      ),
     );
   }
-}
 
-/*
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Perfil")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+  Widget _buildMetricItem(IconData icon, String count, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFD1E3D7)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 4,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
         child: Column(
           children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundImage: NetworkImage("https://via.placeholder.com/150"),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Color(0xFFD6EBE0),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Icon(icon, color: const Color(0xFF1E5E3A), size: 20),
+              ),
             ),
-            const SizedBox(height: 10),
-            const Text(
-              "Usuario Demo",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            const SizedBox(height: 5),
+            Text(
+              count,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F3A22),
+              ),
             ),
-            const SizedBox(height: 30),
-
-            ElevatedButton(
-              child: const Text("Cambiar foto / nombre"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-                );
-              },
-            ),
-
-            const SizedBox(height: 10),
-
-            ElevatedButton(
-              child: const Text("Notificaciones"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationsScreen(),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 10),
-
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text("Cerrar sesión"),
-              onPressed: () {
-                _cerrarSesion(context);
-              },
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF4B5563),
+              ),
             ),
           ],
         ),
@@ -1259,31 +801,139 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _cerrarSesion(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Cerrar sesión"),
-        content: const Text("¿Seguro que deseas salir?"),
-        actions: [
-          TextButton(
-            child: const Text("Cancelar"),
-            onPressed: () => Navigator.pop(context),
+  Widget _buildOptionsSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
           ),
-          TextButton(
-            child: const Text("Salir"),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
+        ],
+      ),
+      child: Column(
+        children: [
+          // 1. Editar perfil
+          _buildOptionTile(
+            icon: Icons.person_outline,
+            title: "Editar perfil",
+            subtitle: "Actualiza tu información personal",
+            onTap: _navigateToUserProfileView,
+          ),
+          const Divider(height: 1, indent: 56, endIndent: 16),
+
+          // 2. Seguridad
+          _buildOptionTile(
+            icon: Icons.lock_outline,
+            title: "Seguridad",
+            subtitle: "Contraseña y acceso a la cuenta",
+            onTap: () {
+              Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
+                MaterialPageRoute(builder: (_) => const SecurityScreen()),
               );
-              //Navigator.pop(context);
-              // aquí luego rediriges al login
             },
+          ),
+          const Divider(height: 1, indent: 56, endIndent: 16),
+
+          // 3. Notificaciones
+          _buildOptionTile(
+            icon: Icons.notifications_none_rounded,
+            title: "Notificaciones",
+            subtitle: "Preferencias de alertas ambientales",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
+              );
+            },
+          ),
+          const Divider(height: 1, indent: 56, endIndent: 16),
+
+          // 4. Permisos
+          _buildOptionTile(
+            icon: Icons.security_outlined,
+            title: "Permisos",
+            subtitle: "Ubicación, cámara y galería",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PermissionsScreen()),
+              );
+            },
+          ),
+          const Divider(height: 1, indent: 56, endIndent: 16),
+
+          // 5. Ayuda y soporte
+          _buildOptionTile(
+            icon: Icons.help_outline_rounded,
+            title: "Ayuda y soporte",
+            subtitle: "Preguntas frecuentes y contacto de campo",
+            onTap: _showHelpSupportModal,
+          ),
+          const Divider(height: 1, indent: 56, endIndent: 16),
+
+          // 6. Cerrar sesión
+          _buildOptionTile(
+            icon: Icons.logout_rounded,
+            iconColor: const Color(0xFFDC2626),
+            iconBgColor: const Color(0xFFFEE2E2),
+            title: "Cerrar sesión",
+            titleColor: const Color(0xFFDC2626),
+            subtitle: "Finalizar sesión en este dispositivo",
+            onTap: _showLogoutDialog,
           ),
         ],
       ),
     );
   }
-}*/
+
+  Widget _buildOptionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Color iconColor = const Color(0xFF1E5E3A),
+    Color iconBgColor = const Color(0xFFE8F5E9),
+    Color titleColor = const Color(0xFF111827),
+  }) {
+    return ListTile(
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: iconBgColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: iconColor, size: 20),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: titleColor,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          fontSize: 11.5,
+          color: Color(0xFF6B7280),
+        ),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: Color(0xFF9CA3AF),
+        size: 22,
+      ),
+    );
+  }
+}

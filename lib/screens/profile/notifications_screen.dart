@@ -13,7 +13,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  static const _baseUrl = '${ApiConfig.baseUrl}';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   List<Map<String, dynamic>> _solicitudes = [];
   bool _isLoading = true;
@@ -61,10 +61,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
         // Ordenar: pendientes primero
         solicitudes.sort((a, b) {
-          if (a['estado'] == 'pendiente' && b['estado'] != 'pendiente')
+          if (a['estado'] == 'pendiente' && b['estado'] != 'pendiente') {
             return -1;
-          if (a['estado'] != 'pendiente' && b['estado'] == 'pendiente')
+          }
+          if (a['estado'] != 'pendiente' && b['estado'] == 'pendiente') {
             return 1;
+          }
           return (b['fechaEnvio'] ?? '').compareTo(a['fechaEnvio'] ?? '');
         });
 
@@ -125,52 +127,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  /*Future<void> _loadNotifications() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final token = await AuthService.getToken();
-      final id = await AuthService.getUserId();
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/proyectos/usuario/$id'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        List<dynamic> misProyectos;
-        if (body is List) {
-          misProyectos = body;
-        } else if (body is Map && body.containsKey('content')) {
-          misProyectos = body['content'] as List;
-        } else {
-          misProyectos = [];
-        }
-        await NotificationService.updateEstados(misProyectos, id!);
-      }
-    } catch (_) {}
-
-    final id = await AuthService.getUserId();
-    // Solo cargar solicitudes del usuario actual
-    final solicitudes = await NotificationService.getSolicitudesDeUsuario(id!);
-
-    solicitudes.sort((a, b) {
-      if (a['estado'] == 'pendiente' && b['estado'] != 'pendiente') return -1;
-      if (a['estado'] != 'pendiente' && b['estado'] == 'pendiente') return 1;
-      return (b['fechaEnvio'] ?? '').compareTo(a['fechaEnvio'] ?? '');
-    });
-
-    if (mounted) {
-      setState(() {
-        _solicitudes = solicitudes;
-        _isLoading = false;
-      });
-    }
-  }*/
 
   Color _statusColor(String estado) {
     switch (estado) {
