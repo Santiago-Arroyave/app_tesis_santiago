@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:goblink_park/screens/main_map/home_map_screen.dart';
-import 'package:goblink_park/screens/observations/my_observations_screen.dart';
 import 'package:goblink_park/screens/profile/profile_screen.dart';
 import 'package:goblink_park/screens/projects/project_screen.dart';
+import 'package:goblink_park/screens/reports/reports_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -16,25 +16,33 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _screens = const [
     HomeMapScreen(),
-    MyObservationsScreen(),
+    ReportsScreen(),
     ProjectScreen(),
     ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final navBg = theme.bottomNavigationBarTheme.backgroundColor ?? theme.colorScheme.surface;
+    final selectedColor = theme.bottomNavigationBarTheme.selectedItemColor ?? theme.colorScheme.primary;
+    final unselectedColor = theme.bottomNavigationBarTheme.unselectedItemColor ?? const Color(0xFF9CA3AF);
+    final borderColor = isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB);
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: navBg,
           border: Border(
-            top: BorderSide(color: Color(0xFFE5E7EB), width: 1.0),
+            top: BorderSide(color: borderColor, width: 1.0),
           ),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: Color(0x12000000),
               blurRadius: 10,
@@ -44,9 +52,9 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          selectedItemColor: const Color(0xFF1E5E3A),
-          unselectedItemColor: const Color(0xFF9CA3AF),
-          backgroundColor: Colors.white,
+          selectedItemColor: selectedColor,
+          unselectedItemColor: unselectedColor,
+          backgroundColor: navBg,
           elevation: 0,
           type: BottomNavigationBarType.fixed,
           selectedLabelStyle: const TextStyle(

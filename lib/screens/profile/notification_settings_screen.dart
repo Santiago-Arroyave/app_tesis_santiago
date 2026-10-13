@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:goblink_park/main.dart';
-import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:goblink_park/providers/theme_provider.dart';
+import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -19,8 +19,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   bool _reportesAsignados = true;
   bool _novedadesProyecto = true;
   bool _alertasAmbientales = true;
-
-  bool _modoOscuro = false;
 
   String _ultimaSincronizacion = "10 de octubre de 2026, 11:30 PM";
   bool _isSyncing = false;
@@ -38,16 +36,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     final amb = await _storage.read(key: 'pref_notif_ambientales');
     final sync = await _storage.read(key: 'pref_ultima_sync');
 
-    final prefs = await SharedPreferences.getInstance();
-    final isDark = prefs.getBool('is_dark_mode') ?? (themeNotifier.value == ThemeMode.dark);
-
     if (!mounted) return;
     setState(() {
       if (act != null) _recordatoriosActividades = act == 'true';
       if (rep != null) _reportesAsignados = rep == 'true';
       if (nov != null) _novedadesProyecto = nov == 'true';
       if (amb != null) _alertasAmbientales = amb == 'true';
-      _modoOscuro = isDark;
       if (sync != null) {
         _ultimaSincronizacion = sync;
       } else {
@@ -106,8 +100,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDarkModeActive = themeProvider.isDarkMode;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
@@ -119,33 +118,33 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               const SizedBox(height: 16),
 
               // 2. Título de pantalla
-              const Text(
+              Text(
                 "Notificaciones y preferencias",
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F3A22),
+                  color: theme.colorScheme.onSurface,
                   letterSpacing: -0.4,
                 ),
               ),
               const SizedBox(height: 3),
-              const Text(
+              Text(
                 "Configura las alertas que deseas recibir y personaliza tu experiencia.",
                 style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF4B5563),
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
                   height: 1.35,
                 ),
               ),
               const SizedBox(height: 16),
 
               // 3. Sección Notificaciones
-              const Text(
+              Text(
                 "Notificaciones",
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F3A22),
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
@@ -153,16 +152,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               const SizedBox(height: 20),
 
               // 4. Sección Preferencias
-              const Text(
+              Text(
                 "Preferencias",
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F3A22),
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
-              _buildPreferencesCard(),
+              _buildPreferencesCard(
+                isDark: isDarkModeActive,
+                onThemeChanged: (val) {
+                  context.read<ThemeProvider>().toggleTheme(val);
+                },
+              ),
               const SizedBox(height: 20),
 
               // 5. Tarjeta de Sincronización de Datos
@@ -179,10 +183,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   // ===========================================================================
 
   Widget _buildInstitutionalHeader() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(22),
         boxShadow: const [
           BoxShadow(
@@ -195,7 +202,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F3A22), size: 20),
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: isDark ? const Color(0xFFE8F5E9) : const Color(0xFF0F3A22),
+              size: 20,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           ClipOval(
@@ -207,52 +218,48 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "Monitoreo Duende",
+                  "Goblin Park",
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F3A22),
+                    color: theme.colorScheme.onSurface,
                     letterSpacing: -0.3,
                   ),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 1),
                 Text(
                   "PNR Páramo del Duende",
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF2E4F3E),
+                    color: isDark ? const Color(0xFFA3B899) : const Color(0xFF2E4F3E),
                   ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 25),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-          ),
+          const NotificationBellButton(size: 25),
         ],
       ),
     );
   }
 
   Widget _buildNotificationsCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final dividerColor = isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: dividerColor),
         boxShadow: const [
           BoxShadow(
             color: Color(0x08000000),
@@ -274,7 +281,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               _updatePref('pref_notif_actividades', v);
             },
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16),
+          Divider(height: 1, indent: 64, endIndent: 16, color: dividerColor),
 
           // 2. Reportes asignados
           _buildSwitchTile(
@@ -287,7 +294,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               _updatePref('pref_notif_reportes', v);
             },
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16),
+          Divider(height: 1, indent: 64, endIndent: 16, color: dividerColor),
 
           // 3. Novedades del proyecto
           _buildSwitchTile(
@@ -300,7 +307,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               _updatePref('pref_notif_novedades', v);
             },
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16),
+          Divider(height: 1, indent: 64, endIndent: 16, color: dividerColor),
 
           // 4. Alertas ambientales
           _buildSwitchTile(
@@ -318,12 +325,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
 
-  Widget _buildPreferencesCard() {
+  Widget _buildPreferencesCard({
+    required bool isDark,
+    required ValueChanged<bool> onThemeChanged,
+  }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final borderColor = isDarkMode ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: borderColor),
         boxShadow: const [
           BoxShadow(
             color: Color(0x08000000),
@@ -336,13 +350,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         icon: Icons.dark_mode_outlined,
         title: "Modo oscuro",
         subtitle: "Interfaz en tonos oscuros",
-        value: _modoOscuro,
-        onChanged: (val) async {
-          setState(() => _modoOscuro = val);
-          themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('is_dark_mode', val);
-        },
+        value: isDark,
+        onChanged: onThemeChanged,
       ),
     );
   }
@@ -354,41 +363,61 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 38,
         height: 38,
-        decoration: const BoxDecoration(
-          color: Color(0xFFE8F5E9),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1B4332) : const Color(0xFFE8F5E9),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: const Color(0xFF1E5E3A), size: 20),
+        child: Icon(
+          icon,
+          color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+          size: 20,
+        ),
       ),
       title: Text(
         title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.onSurface,
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+        style: TextStyle(
+          fontSize: 12,
+          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+        ),
       ),
       trailing: Switch(
         value: value,
-        activeThumbColor: const Color(0xFF1E5E3A),
-        activeTrackColor: const Color(0xFFDCFCE7),
+        activeThumbColor: const Color(0xFF52B788),
+        activeTrackColor: isDark ? const Color(0xFF2D6A4F) : const Color(0xFFDCFCE7),
         onChanged: onChanged,
       ),
     );
   }
 
   Widget _buildSyncCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFEBF3EE),
+        color: isDark ? const Color(0xFF1B2620) : const Color(0xFFEBF3EE),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFD1E3D7), width: 1.2),
+        border: Border.all(
+          color: isDark ? const Color(0x3352B788) : const Color(0xFFD1E3D7),
+          width: 1.2,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,14 +426,18 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFD6EBE0),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF22352B) : const Color(0xFFD6EBE0),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.cloud_sync_outlined, color: Color(0xFF1E5E3A), size: 20),
+                child: Icon(
+                  Icons.cloud_sync_outlined,
+                  color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -413,13 +446,16 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F3A22),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       "Mantén tus datos actualizados en todos tus dispositivos.",
-                      style: TextStyle(fontSize: 11.5, color: Color(0xFF4B5563)),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
+                      ),
                     ),
                   ],
                 ),
@@ -429,10 +465,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           const SizedBox(height: 12),
           Text(
             "Última sincronización: $_ultimaSincronizacion",
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF6B7280),
+              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
             ),
           ),
           const SizedBox(height: 14),
@@ -453,7 +489,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E5E3A),
+                backgroundColor: isDark ? const Color(0xFF2D6A4F) : const Color(0xFF1E5E3A),
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),

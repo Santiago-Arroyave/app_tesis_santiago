@@ -55,7 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final LocalAuthentication auth = LocalAuthentication();
       final didAuthenticate = await auth.authenticate(
-        localizedReason: 'Identifícate para ingresar a Monitoreo Duende',
+        localizedReason: 'Identifícate para ingresar a Goblin Park',
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );

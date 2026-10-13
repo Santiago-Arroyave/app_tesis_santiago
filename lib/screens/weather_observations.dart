@@ -26,7 +26,7 @@ class WeatherObservations extends StatelessWidget {
                   itemCount: favoritesWeather.length,
                   itemBuilder: (context, index) {
                     final weather = favoritesWeather[index];
-                    return favoritesWeatherCard(weather: weather);
+                    return FavoritesWeatherCard(weather: weather);
                   },
                 );
         },
@@ -35,9 +35,9 @@ class WeatherObservations extends StatelessWidget {
   }
 }
 
-class favoritesWeatherCard extends StatelessWidget {
+class FavoritesWeatherCard extends StatelessWidget {
   final Weather weather;
-  const favoritesWeatherCard({super.key, required this.weather});
+  const FavoritesWeatherCard({super.key, required this.weather});
 
   @override
   Widget build(BuildContext context) {

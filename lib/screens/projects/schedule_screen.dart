@@ -186,6 +186,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                     width: 40,
                                     height: 40,
                                     fit: BoxFit.cover,
+                                    memCacheWidth: 600,
                                     placeholder: (context, url) => Container(
                                       width: 40,
                                       height: 40,
@@ -951,6 +952,7 @@ class _ActivityDetailScreenState extends State<_ActivityDetailScreen> {
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
+                    memCacheWidth: 600,
                     placeholder: (context, url) => Container(
                       width: double.infinity,
                       height: 200,

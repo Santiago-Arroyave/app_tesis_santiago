@@ -84,6 +84,7 @@ class HomeScreen extends StatelessWidget {
                     child: CachedNetworkImage(
                       imageUrl: recipe.img_link,
                       fit: BoxFit.cover,
+                      memCacheWidth: 600,
                       placeholder: (context, url) => Container(color: Colors.grey.shade200),
                       errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.grey),
                     ),

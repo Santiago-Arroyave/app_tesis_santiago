@@ -7,7 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:goblink_park/screens/profile/edit_profile_screen.dart';
-import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:goblink_park/services/user_service.dart';
+import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 class UserProfileViewScreen extends StatefulWidget {
   final Map<String, dynamic>? usuario;
@@ -28,6 +29,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
   late Map<String, dynamic> _usuario;
   late Map<String, dynamic> _estadisticas;
   bool _isUpdatingPhoto = false;
+  bool _isUpdatingCover = false;
 
   @override
   void initState() {
@@ -52,7 +54,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
         if (perfilRes.statusCode == 200) {
           final perfilJson = jsonDecode(perfilRes.body);
           if (perfilJson is Map<String, dynamic>) {
-            await AuthService.saveUserData(perfilJson);
+            await UserService.syncGlobalUser(perfilJson);
             if (mounted) {
               setState(() {
                 _usuario = perfilJson;
@@ -116,7 +118,213 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
     }
   }
 
-  void _showPhotoOptions() {
+  // ===========================================================================
+  // FOTO DE PORTADA (BANNER SUPERIOR)
+  // ===========================================================================
+
+  void _cambiarFotoPortada() {
+    final rawPortada = (_usuario['fotoPortadaUrl'] ?? _usuario['fotoPortada'])?.toString();
+    final hasPortada = rawPortada != null && rawPortada.trim().isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              "Foto de portada",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F3A22),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Personaliza el banner de fondo de tu perfil",
+              style: TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 1. Tomar foto
+            _buildPhotoOptionCard(
+              icon: Icons.camera_alt_outlined,
+              iconColor: const Color(0xFF1E5E3A),
+              iconBgColor: const Color(0xFFE8F5E9),
+              title: "Tomar foto con la cámara",
+              subtitle: "Captura una imagen del entorno",
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUploadCoverPhoto(ImageSource.camera);
+              },
+            ),
+            const SizedBox(height: 10),
+            // 2. Seleccionar de galería
+            _buildPhotoOptionCard(
+              icon: Icons.photo_library_outlined,
+              iconColor: const Color(0xFF1E5E3A),
+              iconBgColor: const Color(0xFFE8F5E9),
+              title: "Seleccionar de la galería",
+              subtitle: "Elige una foto panorámica de tu galería",
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUploadCoverPhoto(ImageSource.gallery);
+              },
+            ),
+            if (hasPortada) ...[
+              const SizedBox(height: 10),
+              // 3. Restablecer portada predeterminada
+              _buildPhotoOptionCard(
+                icon: Icons.restore_rounded,
+                iconColor: const Color(0xFFE53935),
+                iconBgColor: const Color(0xFFFFEBEE),
+                title: "Restablecer portada institucional",
+                titleColor: const Color(0xFFE53935),
+                subtitle: "Vuelve al paisaje predeterminado del páramo",
+                arrowColor: const Color(0xFFE53935),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _deleteCoverPhoto();
+                },
+              ),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF3F4F6),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+                child: const Text(
+                  "Cancelar",
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadCoverPhoto(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 900,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      setState(() => _isUpdatingCover = true);
+
+      final file = File(picked.path);
+      final updatedUser = await UserService.subirFotoPortada(file);
+
+      if (!mounted) return;
+      setState(() {
+        if (updatedUser != null) {
+          _usuario = Map<String, dynamic>.from(updatedUser);
+        }
+        _isUpdatingCover = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Foto de portada actualizada correctamente"),
+          backgroundColor: Color(0xFF1E5E3A),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUpdatingCover = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error al cambiar portada: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteCoverPhoto() async {
+    setState(() => _isUpdatingCover = true);
+    try {
+      final updatedUser = await UserService.eliminarFotoPortada();
+      if (!mounted) return;
+      if (updatedUser != null) {
+        setState(() {
+          _usuario = Map<String, dynamic>.from(updatedUser);
+          _isUpdatingCover = false;
+        });
+      } else {
+        _usuario['fotoPortada'] = '';
+        _usuario['fotoPortadaUrl'] = '';
+        _usuario['foto_portada'] = '';
+        await UserService.syncGlobalUser(_usuario);
+        if (!mounted) return;
+        setState(() {
+          _isUpdatingCover = false;
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Foto de portada restablecida"),
+          backgroundColor: Color(0xFF1E5E3A),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUpdatingCover = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error al restablecer portada: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ===========================================================================
+  // FOTO DE PERFIL (AVATAR CIRCULAR)
+  // ===========================================================================
+
+  void _cambiarFotoPerfil() {
+    final rawFoto = (_usuario['fotoPerfilUrl'] ?? _usuario['fotoPerfil'])?.toString();
+    final hasFoto = rawFoto != null && rawFoto.trim().isNotEmpty;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -149,6 +357,14 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
                 color: Color(0xFF0F3A22),
               ),
             ),
+            const SizedBox(height: 4),
+            const Text(
+              "Esta imagen se mostrará en tu avatar institucional",
+              style: TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF6B7280),
+              ),
+            ),
             const SizedBox(height: 16),
             // 1. Tomar foto
             _buildPhotoOptionCard(
@@ -159,7 +375,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
               subtitle: "Usa la cámara de tu dispositivo",
               onTap: () {
                 Navigator.pop(ctx);
-                _pickAndUploadPhoto(ImageSource.camera);
+                _pickAndUploadProfilePhoto(ImageSource.camera);
               },
             ),
             const SizedBox(height: 10),
@@ -172,24 +388,26 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
               subtitle: "Elige una foto de tu galería",
               onTap: () {
                 Navigator.pop(ctx);
-                _pickAndUploadPhoto(ImageSource.gallery);
+                _pickAndUploadProfilePhoto(ImageSource.gallery);
               },
             ),
-            const SizedBox(height: 10),
-            // 3. Eliminar foto actual
-            _buildPhotoOptionCard(
-              icon: Icons.delete_outline,
-              iconColor: const Color(0xFFE53935),
-              iconBgColor: const Color(0xFFFFEBEE),
-              title: "Eliminar foto actual",
-              titleColor: const Color(0xFFE53935),
-              subtitle: "Se quitará tu foto de perfil",
-              arrowColor: const Color(0xFFE53935),
-              onTap: () {
-                Navigator.pop(ctx);
-                _deleteCurrentPhoto();
-              },
-            ),
+            if (hasFoto) ...[
+              const SizedBox(height: 10),
+              // 3. Eliminar foto actual
+              _buildPhotoOptionCard(
+                icon: Icons.delete_outline,
+                iconColor: const Color(0xFFE53935),
+                iconBgColor: const Color(0xFFFFEBEE),
+                title: "Eliminar foto actual",
+                titleColor: const Color(0xFFE53935),
+                subtitle: "Se quitará tu foto de perfil",
+                arrowColor: const Color(0xFFE53935),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _deleteProfilePhoto();
+                },
+              ),
+            ],
             const SizedBox(height: 20),
             // Botón Cancelar
             SizedBox(
@@ -288,7 +506,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
     );
   }
 
-  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+  Future<void> _pickAndUploadProfilePhoto(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(
         source: source,
@@ -300,36 +518,16 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
 
       setState(() => _isUpdatingPhoto = true);
 
-      final token = await AuthService.getToken();
       final file = File(picked.path);
+      final updatedUser = await UserService.subirFotoPerfil(file);
 
-      if (token != null && token.isNotEmpty) {
-        try {
-          final uri = Uri.parse('${ApiConfig.baseUrl}/api/usuarios/perfil');
-          final request = http.MultipartRequest('PUT', uri);
-          request.headers['Authorization'] = 'Bearer $token';
-          request.files.add(await http.MultipartFile.fromPath('fotoPerfil', file.path));
-
-          final streamedResponse = await request.send().timeout(const Duration(seconds: 20));
-          if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
-            final resStr = await streamedResponse.stream.bytesToString();
-            try {
-              final backendData = jsonDecode(resStr);
-              if (backendData is Map<String, dynamic>) {
-                final current = await AuthService.getUserData() ?? _usuario;
-                final merged = Map<String, dynamic>.from(current)..addAll(backendData);
-                await AuthService.saveUserData(merged);
-              }
-            } catch (_) {}
-          }
-        } catch (e) {
-          debugPrint('Backend upload foto: $e');
-        }
-      }
-
-      await _refreshUserData();
       if (!mounted) return;
-      setState(() => _isUpdatingPhoto = false);
+      setState(() {
+        if (updatedUser != null) {
+          _usuario = Map<String, dynamic>.from(updatedUser);
+        }
+        _isUpdatingPhoto = false;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -342,46 +540,29 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
       setState(() => _isUpdatingPhoto = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Error al cambiar foto: $e"),
+          content: Text("Error al cambiar foto de perfil: $e"),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  Future<void> _deleteCurrentPhoto() async {
+  Future<void> _deleteProfilePhoto() async {
     setState(() => _isUpdatingPhoto = true);
 
     try {
-      final token = await AuthService.getToken();
-      final updatedData = Map<String, dynamic>.from(_usuario);
-      updatedData['fotoPerfil'] = '';
-      await AuthService.saveUserData(updatedData);
+      final updatedUser = await UserService.eliminarFotoPerfil();
 
-      if (token != null && token.isNotEmpty) {
-        try {
-          final uri = Uri.parse('${ApiConfig.baseUrl}/api/usuarios/perfil');
-          final request = http.MultipartRequest('PUT', uri);
-          request.headers['Authorization'] = 'Bearer $token';
-          request.fields['fotoPerfil'] = '';
-
-          final streamedResponse = await request.send().timeout(const Duration(seconds: 15));
-          if (streamedResponse.statusCode == 200) {
-            final resStr = await streamedResponse.stream.bytesToString();
-            try {
-              final backendData = jsonDecode(resStr);
-              if (backendData is Map<String, dynamic>) {
-                final merged = Map<String, dynamic>.from(updatedData)..addAll(backendData);
-                await AuthService.saveUserData(merged);
-              }
-            } catch (_) {}
-          }
-        } catch (_) {}
-      }
-
-      await _refreshUserData();
       if (!mounted) return;
-      setState(() => _isUpdatingPhoto = false);
+      setState(() {
+        if (updatedUser != null) {
+          _usuario = Map<String, dynamic>.from(updatedUser);
+        } else {
+          _usuario['fotoPerfil'] = '';
+          _usuario['fotoPerfilUrl'] = '';
+        }
+        _isUpdatingPhoto = false;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -435,7 +616,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
       );
     }
 
-    final rawFoto = _usuario['fotoPerfil']?.toString();
+    final rawFoto = (_usuario['fotoPerfilUrl'] ?? _usuario['fotoPerfil'])?.toString();
     if (rawFoto != null && rawFoto.trim().isNotEmpty) {
       if (rawFoto.startsWith('http://') || rawFoto.startsWith('https://')) {
         return ClipOval(
@@ -444,6 +625,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
             width: 86,
             height: 86,
             fit: BoxFit.cover,
+            memCacheWidth: 600,
             placeholder: (context, url) => Container(
               width: 86,
               height: 86,
@@ -493,14 +675,16 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
   }
 
   Widget _buildCoverBanner() {
-    final rawPortada = _usuario['fotoPortada']?.toString();
+    Widget content;
+    final rawPortada = (_usuario['fotoPortadaUrl'] ?? _usuario['fotoPortada'])?.toString();
     if (rawPortada != null && rawPortada.trim().isNotEmpty) {
       if (rawPortada.startsWith('http://') || rawPortada.startsWith('https://')) {
-        return CachedNetworkImage(
+        content = CachedNetworkImage(
           imageUrl: rawPortada,
           width: double.infinity,
           height: 140,
           fit: BoxFit.cover,
+          memCacheWidth: 1200,
           placeholder: (context, url) => Container(
             width: double.infinity,
             height: 140,
@@ -513,41 +697,66 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
             fit: BoxFit.cover,
           ),
         );
-      }
-      try {
-        String clean = rawPortada;
-        if (clean.contains(',')) {
-          clean = clean.split(',').last;
-        }
-        final bytes = base64Decode(clean);
-        return Image.memory(
-          bytes,
-          width: double.infinity,
-          height: 140,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => Image.asset(
+      } else {
+        try {
+          String clean = rawPortada;
+          if (clean.contains(',')) {
+            clean = clean.split(',').last;
+          }
+          final bytes = base64Decode(clean);
+          content = Image.memory(
+            bytes,
+            width: double.infinity,
+            height: 140,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => Image.asset(
+              'assets/images/Fondo-Login.png',
+              width: double.infinity,
+              height: 140,
+              fit: BoxFit.cover,
+            ),
+          );
+        } catch (_) {
+          content = Image.asset(
             'assets/images/Fondo-Login.png',
             width: double.infinity,
             height: 140,
             fit: BoxFit.cover,
-          ),
-        );
-      } catch (_) {
-        return Image.asset(
-          'assets/images/Fondo-Login.png',
-          width: double.infinity,
-          height: 140,
-          fit: BoxFit.cover,
-        );
+          );
+        }
       }
+    } else {
+      content = Image.asset(
+        'assets/images/Fondo-Login.png',
+        width: double.infinity,
+        height: 140,
+        fit: BoxFit.cover,
+      );
     }
 
-    return Image.asset(
-      'assets/images/Fondo-Login.png',
-      width: double.infinity,
-      height: 140,
-      fit: BoxFit.cover,
-    );
+    if (_isUpdatingCover) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          content,
+          Container(
+            color: const Color(0x66000000),
+            child: const Center(
+              child: SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.8,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return content;
   }
 
   @override
@@ -745,7 +954,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "Monitoreo Duende",
+                  "Goblin Park",
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
@@ -765,15 +974,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 25),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-          ),
+          const NotificationBellButton(size: 25),
         ],
       ),
     );
@@ -819,7 +1020,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: _showPhotoOptions,
+                      onTap: _cambiarFotoPerfil,
                       child: _buildAvatarImage(),
                     ),
                   ),
@@ -833,7 +1034,7 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
                     elevation: 3,
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: _showPhotoOptions,
+                      onTap: _cambiarFotoPerfil,
                       child: const Padding(
                         padding: EdgeInsets.all(7.5),
                         child: Icon(
@@ -857,14 +1058,14 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
               color: Colors.white.withAlpha(220),
               borderRadius: BorderRadius.circular(14),
               child: InkWell(
-                onTap: _showPhotoOptions,
+                onTap: _cambiarFotoPortada,
                 borderRadius: BorderRadius.circular(14),
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.edit_outlined, size: 14, color: Color(0xFF1E5E3A)),
+                      Icon(Icons.camera_alt_outlined, size: 14, color: Color(0xFF1E5E3A)),
                       SizedBox(width: 4),
                       Text(
                         "Editar foto",

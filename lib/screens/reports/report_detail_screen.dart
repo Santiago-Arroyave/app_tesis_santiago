@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:goblink_park/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/login_screen/auth_service.dart';
+import 'package:goblink_park/screens/reports/edit_report_screen.dart';
+import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 class ReportDetailScreen extends StatefulWidget {
   final Map<String, dynamic> reporte;
@@ -16,41 +20,151 @@ class ReportDetailScreen extends StatefulWidget {
 }
 
 class _ReportDetailScreenState extends State<ReportDetailScreen> {
+  static const _baseUrl = ApiConfig.baseUrl;
+
+  late Map<String, dynamic> _reporte;
   List<Map<String, dynamic>> _imagesList = [];
+  bool _canEdit = true;
 
   @override
   void initState() {
     super.initState();
+    _reporte = Map<String, dynamic>.from(widget.reporte);
     _extractImages();
+    _checkAuthorPermission();
+    _cargarDetalleReporte();
+  }
+
+  Future<void> _cargarDetalleReporte() async {
+    final reportId = _reporte['id'] ?? widget.reporte['id'];
+    if (reportId == null) return;
+
+    try {
+      final token = await AuthStorage.getToken();
+      final cleanToken = (token ?? '').trim().startsWith('Bearer ')
+          ? (token ?? '').trim().substring(7).trim()
+          : (token ?? '').trim();
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/reportes/$reportId'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (cleanToken.isNotEmpty) 'Authorization': 'Bearer $cleanToken',
+        },
+      ).timeout(const Duration(seconds: 20));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          setState(() {
+            _reporte = decoded;
+            _extractImages();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error al cargar detalle del reporte: $e');
+    }
+  }
+
+  Future<void> _checkAuthorPermission() async {
+    try {
+      final user = await AuthStorage.getUserData();
+      final currentUserId = await AuthStorage.getUserId();
+      final currentUserEmail = await AuthStorage.getEmail();
+      final userRol = (user?['rol'] ?? user?['rolNombre'] ?? '').toString().toUpperCase();
+
+      if (userRol.contains('ADMIN') || userRol.contains('COORDINADOR')) {
+        if (mounted) setState(() => _canEdit = true);
+        return;
+      }
+
+      final r = _reporte;
+      final reportUserId = r['usuarioId'] ?? r['idUsuario'] ?? r['usuario']?['id'];
+      final reportUserEmail = r['usuarioCorreo'] ??
+          r['correoUsuario'] ??
+          r['usuario']?['correo'] ??
+          r['usuario']?['email'];
+
+      if (currentUserId != null && reportUserId != null) {
+        if (currentUserId.toString() == reportUserId.toString()) {
+          if (mounted) setState(() => _canEdit = true);
+          return;
+        }
+      }
+      if (currentUserEmail != null && reportUserEmail != null) {
+        if (currentUserEmail.toString().toLowerCase() ==
+            reportUserEmail.toString().toLowerCase()) {
+          if (mounted) setState(() => _canEdit = true);
+          return;
+        }
+      }
+      // Delegar la regla final de autorización al backend
+      if (mounted) setState(() => _canEdit = true);
+    } catch (_) {
+      if (mounted) setState(() => _canEdit = true);
+    }
+  }
+
+  Future<void> _openEditScreen() async {
+    final updated = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditReportScreen(reporte: _reporte),
+      ),
+    );
+
+    if (updated != null && mounted) {
+      setState(() {
+        _reporte = Map<String, dynamic>.from(updated);
+        _extractImages();
+      });
+      await _cargarDetalleReporte();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reporte actualizado correctamente'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _extractImages() {
     final list = <Map<String, dynamic>>[];
-    final r = widget.reporte;
+    final r = _reporte;
 
-    // 1. Foto principal
+    // 1. Foto principal registrada por el usuario
     final fotoPrincipal = r['fotoPrincipalUrl'] ?? r['fotoUrl'] ?? r['imagenUrl'] ?? r['urlFoto'] ?? r['foto'];
     if (fotoPrincipal != null && fotoPrincipal.toString().trim().isNotEmpty) {
       list.add({
         'data': fotoPrincipal.toString().trim(),
-        'titulo': 'Vista Principal',
+        'titulo': 'Evidencia Principal',
         'subtitulo': 'Registro en campo',
       });
     }
 
-    // 2. Evidencias complementarias
+    // 2. Evidencias complementarias registradas (ignorando las marcadas como eliminadas)
     final evidencias = r['evidencias'];
     if (evidencias is List && evidencias.isNotEmpty) {
       for (int i = 0; i < evidencias.length; i++) {
         final ev = evidencias[i];
         if (ev is Map) {
+          if (ev['eliminar'] == true) continue;
           final b64 = ev['archivoUrl'] ?? ev['url'] ?? ev['urlArchivo'] ?? ev['fotoUrl'] ?? ev['archivoBase64'];
           if (b64 != null && b64.toString().trim().isNotEmpty) {
+            final trimmed = b64.toString().trim();
+            // Evitar duplicar la foto principal si tiene la misma URL
+            if (fotoPrincipal != null && trimmed == fotoPrincipal.toString().trim()) {
+              continue;
+            }
             list.add({
-              'data': b64.toString().trim(),
+              'data': trimmed,
               'titulo': ev['titulo']?.toString().isNotEmpty == true
                   ? ev['titulo'].toString()
-                  : 'Evidencia ${i + 1}',
+                  : 'Evidencia ${list.length + 1}',
               'subtitulo': ev['descripcion']?.toString().isNotEmpty == true
                   ? ev['descripcion'].toString()
                   : 'Detalle de observación',
@@ -60,33 +174,24 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       }
     }
 
-    // 3. Fallback de categoría si no hay fotos registradas
-    if (list.isEmpty) {
-      list.add({
-        'asset': _getCategoryAsset(r['categoriaNombre']?.toString()),
-        'titulo': 'Vista Principal',
-        'subtitulo': r['categoriaNombre']?.toString() ?? 'Páramo del Duende',
-      });
-    }
-
     _imagesList = list;
   }
 
   String _getCategoryAsset(String? cat) {
     final c = cat?.toLowerCase() ?? '';
     if (c.contains('fauna') || c.contains('animal')) {
-      return 'assets/images/Oso de anteojos-2.jpeg';
+      return 'assets/images/Fauna.jpg';
     }
     if (c.contains('agua') || c.contains('hídric')) {
-      return 'assets/images/Agua.jpeg';
+      return 'assets/images/Agua.jpg';
     }
     if (c.contains('aire') || c.contains('clima')) {
-      return 'assets/images/Aire.jpeg';
+      return 'assets/images/Aire.jpg';
     }
     if (c.contains('suelo') || c.contains('tierra')) {
-      return 'assets/images/Suelo.jpeg';
+      return 'assets/images/Suelo.jpg';
     }
-    return 'assets/images/Flora.jpeg';
+    return 'assets/images/Flora.jpg';
   }
 
   Color _getCategoryColor(String? cat) {
@@ -161,13 +266,14 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
     final raw = item['data'] as String?;
     if (raw == null || raw.isEmpty) {
-      return Image.asset(_getCategoryAsset(widget.reporte['categoriaNombre']?.toString()), fit: fit);
+      return Image.asset(_getCategoryAsset(_reporte['categoriaNombre']?.toString()), fit: fit);
     }
 
     if (raw.startsWith('http://') || raw.startsWith('https://')) {
       return CachedNetworkImage(
         imageUrl: raw,
         fit: fit,
+        memCacheWidth: 600,
         placeholder: (context, url) => Container(color: Colors.grey[200]),
         errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.grey),
       );
@@ -184,13 +290,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
         fit: fit,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => Image.asset(
-          _getCategoryAsset(widget.reporte['categoriaNombre']?.toString()),
+          _getCategoryAsset(_reporte['categoriaNombre']?.toString()),
           fit: fit,
         ),
       );
     } catch (_) {
       return Image.asset(
-        _getCategoryAsset(widget.reporte['categoriaNombre']?.toString()),
+        _getCategoryAsset(_reporte['categoriaNombre']?.toString()),
         fit: fit,
       );
     }
@@ -198,7 +304,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.reporte;
+    final r = _reporte;
     final catNombre = r['categoriaNombre'] ?? r['categoria']?['nombre'] ?? 'Flora';
     final estadoNombre = r['estadoReporteNombre'] ?? r['estado']?['nombre'] ?? 'Validado';
     final titulo = r['titulo']?.toString().isNotEmpty == true
@@ -211,6 +317,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       length: 3,
       child: Scaffold(
         backgroundColor: const Color(0xFFF9FAFB),
+        bottomNavigationBar: _buildBottomBar(r),
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -266,9 +373,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ],
                 ),
               ),
-
-              // 5. Botón inferior fijo "Ver en el mapa"
-              _buildBottomBar(r),
             ],
           ),
         ),
@@ -299,7 +403,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3A22), size: 24),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, _reporte),
           ),
           const SizedBox(width: 2),
           ClipOval(
@@ -317,7 +421,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "Monitoreo Duende",
+                  "Goblin Park",
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -337,38 +441,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               ],
             ),
           ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 25),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                  );
-                },
-              ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4.5),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1E5E3A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          if (_canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: Color(0xFF1E5E3A), size: 22),
+              tooltip: 'Editar reporte',
+              onPressed: _openEditScreen,
+            ),
+          const NotificationBellButton(),
         ],
       ),
     );
@@ -403,57 +482,30 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
         : 'Espécimen registrado durante el recorrido de monitoreo en el páramo. Presenta buen estado de conservación y desarrollo biológico adecuado para las condiciones climáticas del sector.';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 95),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagen destacada principal con badge contador flotante
-          if (_imagesList.isNotEmpty)
-            GestureDetector(
-              onTap: () => _openFullScreenViewer(0),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      height: 210,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: _buildImageWidget(_imagesList[0]),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(170),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.photo_camera, color: Colors.white, size: 13),
-                          const SizedBox(width: 4),
-                          Text(
-                            '1/${_imagesList.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+          // Imagen representativa temática de la categoría
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Image.asset(
+                _getCategoryAsset(catNombre),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: catColor,
+                  child: Icon(_getCategoryIcon(catNombre), size: 48, color: Colors.white),
+                ),
               ),
             ),
+          ),
           const SizedBox(height: 16),
 
           // Píldoras de Categoría y Estado
@@ -589,10 +641,80 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               ],
             ),
           ),
+
+          // Tarjeta de Datos Específicos de la Categoría (si existen)
+          if (_extractSpecificData(r['datosEspecificos'] ?? r['specificData']).isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0A000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(_getCategoryIcon(catNombre), color: catColor, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Información Específica ($catNombre)",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F3A22),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  ..._extractSpecificData(r['datosEspecificos'] ?? r['specificData']).entries.map((entry) {
+                    final val = entry.value is List
+                        ? (entry.value as List).join(', ')
+                        : entry.value.toString();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildDataRow(
+                        Icons.check_circle_outline,
+                        _capitalize(entry.key),
+                        val.isNotEmpty ? val : 'No especificado',
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),
     );
+  }
+
+  Map<String, dynamic> _extractSpecificData(dynamic raw) {
+    if (raw == null) return {};
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    return {};
+  }
+
+  String _capitalize(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1);
   }
 
   Widget _buildDataRow(
@@ -656,8 +778,37 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   // ===========================================================================
 
   Widget _buildTabEvidencias() {
+    if (_imagesList.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.photo_library_outlined, size: 54, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              const Text(
+                "Sin evidencias fotográficas",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF374151),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "Este reporte no contiene fotografías adjuntas.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 95),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -776,7 +927,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final fecha = _formatDate(r['fechaReporte'] ?? r['fechaCreacion']);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 95),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1031,43 +1182,47 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   // ===========================================================================
 
   Widget _buildBottomBar(Map<String, dynamic> r) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x10000000),
-            blurRadius: 10,
-            offset: Offset(0, -3),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: ElevatedButton.icon(
-          onPressed: () {
-            Navigator.pop(context, {
-              'action': 'center_on_map',
-              'reporte': r,
-            });
-          },
-          icon: const Icon(Icons.map_rounded, color: Colors.white, size: 20),
-          label: const Text(
-            "Ver en el mapa",
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
+    return SafeArea(
+      top: false,
+      bottom: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x10000000),
+              blurRadius: 10,
+              offset: Offset(0, -3),
             ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1E5E3A),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+          ],
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context, {
+                'action': 'center_on_map',
+                'reporte': r,
+              });
+            },
+            icon: const Icon(Icons.map_rounded, color: Colors.white, size: 20),
+            label: const Text(
+              "Ver en el mapa",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E5E3A),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ),
@@ -1122,6 +1277,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
       return CachedNetworkImage(
         imageUrl: raw,
         fit: BoxFit.contain,
+        memCacheWidth: 600,
         placeholder: (context, url) => const Center(
           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
         ),

@@ -15,7 +15,7 @@ class MyObservationsScreen extends StatefulWidget {
 }
 
 class _MyObservationsScreenState extends State<MyObservationsScreen> {
-  static const _baseUrl = '${ApiConfig.baseUrl}';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   List<dynamic> _observations = [];
   bool _isLoading = true;
@@ -287,6 +287,7 @@ class _MyObservationsScreenState extends State<MyObservationsScreen> {
   }
 
   void _shareObservation(Map<String, dynamic> obs) {
+    // ignore: deprecated_member_use
     Share.share(
       '📍 Observación: ${obs['titulo']}\n'
       '🌿 Categoría: ${obs['categoriaNombre']}\n'
@@ -574,7 +575,7 @@ class _ObservationTile extends StatelessWidget {
                 width: 64,
                 height: 64,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (context, error, stackTrace) => Container(
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
@@ -612,7 +613,7 @@ class MyObservationsScreen extends StatefulWidget {
 }
 
 class _MyObservationsScreenState extends State<MyObservationsScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   List<dynamic> _observations = [];
   bool _isLoading = true;
@@ -1138,7 +1139,7 @@ class MyObservationsScreen extends StatefulWidget {
 }
 
 class _MyObservationsScreenState extends State<MyObservationsScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   List<dynamic> _observations = [];
   bool _isLoading = true;

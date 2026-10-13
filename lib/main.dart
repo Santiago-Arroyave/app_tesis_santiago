@@ -1,6 +1,11 @@
-//import 'package:app_tesis/screens/login_screen/login_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:goblink_park/providers/notification_provider.dart';
+import 'package:goblink_park/providers/theme_provider.dart';
+import 'package:goblink_park/theme/app_theme.dart';
+import 'package:goblink_park/services/push_notification_service.dart';
+import 'package:goblink_park/services/sync_service.dart';
 import 'package:goblink_park/screens/main_home.dart';
 import 'package:goblink_park/screens/splash_screen/splash_screen.dart';
 
@@ -9,9 +14,22 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  final bool isDark = prefs.getBool('is_dark_mode') ?? false;
+  final bool isDark = prefs.getBool('isDarkMode') ?? prefs.getBool('is_dark_mode') ?? false;
   themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
-  runApp(const MyApp());
+
+  // Inicializar servicio de notificaciones push y sincronización offline en paralelo
+  PushNotificationService.initialize();
+  SyncService.instance.initialize();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider(initialIsDark: isDark)),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -19,35 +37,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (_, ThemeMode currentMode, child) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
         return MaterialApp(
-          themeMode: currentMode,
-          theme: ThemeData(
-            brightness: Brightness.light,
-            primaryColor: const Color(0xFF1E5E3A),
-            scaffoldBackgroundColor: const Color(0xFFF9FAFB),
-            progressIndicatorTheme: const ProgressIndicatorThemeData(
-              color: Color.fromARGB(255, 7, 83, 11),
-            ),
-          ),
-          darkTheme: ThemeData(
-            brightness: Brightness.dark,
-            primaryColor: const Color(0xFF1E5E3A),
-            scaffoldBackgroundColor: const Color(0xFF121212),
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF1E5E3A),
-              secondary: Color(0xFF2E7D32),
-              surface: Color(0xFF1E1E1E),
-            ),
-            progressIndicatorTheme: const ProgressIndicatorThemeData(
-              color: Color(0xFF4CAF50),
-            ),
-          ),
           debugShowCheckedModeBanner: false,
-          title: 'GoblinPark App',
-          home: SplashScreen(),
+          title: 'Goblin Park',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
+          home: const SplashScreen(),
         );
       },
     );

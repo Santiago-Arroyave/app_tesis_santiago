@@ -198,6 +198,7 @@ class ObservationDetailScreen extends StatelessWidget {
                         ? CachedNetworkImage(
                             imageUrl: urlArchivo,
                             fit: BoxFit.cover,
+                            memCacheWidth: 600,
                             placeholder: (context, url) => Container(
                               color: Colors.grey.shade200,
                               child: const Center(

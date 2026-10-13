@@ -5,7 +5,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
-import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 class SecurityScreen extends StatefulWidget {
   const SecurityScreen({super.key});
@@ -482,7 +482,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "Monitoreo Duende",
+                  "Goblin Park",
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
@@ -502,15 +502,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 25),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-          ),
+          const NotificationBellButton(size: 25),
         ],
       ),
     );

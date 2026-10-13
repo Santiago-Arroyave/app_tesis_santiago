@@ -8,6 +8,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
+import 'package:goblink_park/screens/reports/my_reports_screen.dart';
+import 'package:goblink_park/services/local_database_service.dart';
+import 'package:goblink_park/services/sync_service.dart';
+import 'package:uuid/uuid.dart';
 
 class ObservationFormScreen extends StatefulWidget {
   final LatLng location;
@@ -24,17 +28,15 @@ class ObservationFormScreen extends StatefulWidget {
 }
 
 class _ObservationFormScreenState extends State<ObservationFormScreen> {
-  static const _baseUrl = '${ApiConfig.baseUrl}';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   final _typeController = TextEditingController();
   final _descController = TextEditingController();
-  List<File> _photos = [];
+  final List<File> _photos = [];
 
   // Catálogos del backend
   List<dynamic> _prioridades = [];
-  List<dynamic> _estadosReporte = [];
   int? _selectedPrioridadId;
-  int? _selectedEstadoId;
   int? _categoriaId; // Se resuelve buscando por nombre
 
   bool _loadingCatalogos = true;
@@ -60,14 +62,28 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     }
   }
 
-  Color _priorityColor(String nombre) {
-    final n = nombre.toLowerCase();
-    if (n.contains('alta') || n.contains('crítica') || n.contains('critica')) {
-      return Colors.red.shade600;
-    } else if (n.contains('baja')) {
-      return const Color.fromARGB(255, 7, 83, 11);
+  int _fallbackCategoryId(String cat) {
+    final c = cat.toLowerCase();
+    if (c.contains('fauna')) return 1;
+    if (c.contains('flora')) return 2;
+    if (c.contains('suelo')) return 3;
+    if (c.contains('agua')) return 4;
+    if (c.contains('aire')) return 5;
+    return 2;
+  }
+
+  String _priorityNameFromId(int? id) {
+    if (id == null) return 'Media';
+    final match = _prioridades.firstWhere(
+      (p) => p is Map && p['id'] == id,
+      orElse: () => null,
+    );
+    if (match is Map && match['nombre'] != null) {
+      return match['nombre'].toString();
     }
-    return Colors.orange.shade600;
+    if (id == 3) return 'Alta';
+    if (id == 2) return 'Media';
+    return 'Baja';
   }
 
   // ── Cargar catálogos del backend ───────────────────────────
@@ -80,9 +96,8 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       };
 
       final results = await Future.wait([
-        http.get(Uri.parse('$_baseUrl/api/prioridades'), headers: headers),
-        http.get(Uri.parse('$_baseUrl/api/estados-reporte'), headers: headers),
-        http.get(Uri.parse('$_baseUrl/api/categorias'), headers: headers),
+        http.get(Uri.parse('$_baseUrl/api/prioridades'), headers: headers).timeout(const Duration(seconds: 8)),
+        http.get(Uri.parse('$_baseUrl/api/categorias'), headers: headers).timeout(const Duration(seconds: 8)),
       ]);
 
       if (!mounted) return;
@@ -91,8 +106,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       prioridades.sort(
         (a, b) => (b['nivel'] as int).compareTo(a['nivel'] as int),
       );
-      final estados = jsonDecode(results[1].body) as List;
-      final categorias = jsonDecode(results[2].body) as List;
+      final categorias = jsonDecode(results[1].body) as List;
 
       // Buscar el ID de la categoría por nombre
       final catMatch = categorias.firstWhere(
@@ -104,15 +118,19 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
 
       setState(() {
         _prioridades = prioridades;
-        _estadosReporte = estados;
-        _categoriaId = catMatch != null ? catMatch['id'] as int : null;
+        _categoriaId = catMatch != null ? catMatch['id'] as int : _fallbackCategoryId(widget.category);
         _loadingCatalogos = false;
       });
     } catch (e) {
       if (mounted) {
         setState(() {
+          _prioridades = [
+            {'id': 3, 'nombre': 'Alta', 'nivel': 3},
+            {'id': 2, 'nombre': 'Media', 'nivel': 2},
+            {'id': 1, 'nombre': 'Baja', 'nivel': 1},
+          ];
+          _categoriaId = _fallbackCategoryId(widget.category);
           _loadingCatalogos = false;
-          _errorMessage = 'Error cargando catálogos: $e';
         });
       }
     }
@@ -145,10 +163,14 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     try {
       final picked = await ImagePicker().pickImage(
         source: source,
-        imageQuality: 80,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 75,
       );
       if (picked != null && mounted) {
-        setState(() => _photos.add(File(picked.path)));
+        final savedFile = await LocalDatabaseService.compressAndSavePhoto(File(picked.path));
+        if (!mounted) return;
+        setState(() => _photos.add(savedFile));
       }
     } catch (e) {
       if (mounted) {
@@ -158,45 +180,42 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       }
     }
   }
-  /*Future<void> _pickPhoto() async {
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Seleccionar foto'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.green),
-              title: const Text('Tomar foto'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.blue),
-              title: const Text('Galería'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
+
+  Future<void> _saveToOfflineQueue(String clientUuid) async {
+    final persistedFiles = await LocalDatabaseService.compressAndSavePhotos(_photos);
+    final persistedPaths = persistedFiles.map((f) => f.path).toList();
+    await LocalDatabaseService.instance.insertOfflineReport(
+      clientUuid: clientUuid,
+      titulo: _typeController.text.trim(),
+      categoria: widget.category,
+      prioridad: _priorityNameFromId(_selectedPrioridadId),
+      descripcion: _descController.text.trim(),
+      latitud: widget.location.latitude,
+      longitud: widget.location.longitude,
+      fotoRutaLocal: persistedPaths.isNotEmpty ? persistedPaths.first : '',
+      fotosAdicionales: persistedPaths.length > 1 ? persistedPaths.sublist(1) : const <String>[],
+    );
+    await SyncService.instance.refreshPendingCount();
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Sin conexión: El reporte se guardó de forma segura en tu teléfono y se subirá automáticamente cuando tengas señal.',
         ),
+        backgroundColor: Color(0xFF1E5E3A),
+        duration: Duration(seconds: 4),
       ),
     );
-    if (source == null || !mounted) return;
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: source,
-        imageQuality: 80,
-      );
-      if (picked != null && mounted) {
-        setState(() => _photo = File(picked.path));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
-    }
-  }*/
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const MyReportsScreen()),
+      (route) => route.isFirst,
+    );
+  }
 
   // ── Guardar observación → POST /api/reportes ───────────────
   Future<void> _saveObservation() async {
@@ -214,17 +233,19 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       return;
     }
 
-    if (_categoriaId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se encontró la categoría')),
-      );
-      return;
-    }
+    _categoriaId ??= _fallbackCategoryId(widget.category);
 
     setState(() {
       _saving = true;
       _errorMessage = null;
     });
+
+    final String clientUuid = const Uuid().v4();
+    final bool hasInternet = await SyncService.hasInternetConnection();
+    if (!hasInternet) {
+      await _saveToOfflineQueue(clientUuid);
+      return;
+    }
 
     try {
       final token = await AuthService.getToken();
@@ -236,59 +257,36 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
 
       request.headers['Authorization'] = 'Bearer $token';
 
-      //==============================
-      // Datos del reporte
-      //==============================
+      request.fields['clientUuid'] = clientUuid;
       request.fields['titulo'] = _typeController.text.trim();
       request.fields['descripcion'] = _descController.text.trim();
       request.fields['categoriaId'] = _categoriaId.toString();
       request.fields['prioridadId'] = _selectedPrioridadId.toString();
       request.fields['latitud'] = widget.location.latitude.toString();
-
       request.fields['longitud'] = widget.location.longitude.toString();
-
       request.fields['fuente'] = 'mobile';
 
-      /*
-      //==============================
-      // Imágenes
-      //==============================
       for (int i = 0; i < _photos.length; i++) {
+        final file = _photos[i];
+        final extension = file.path.split('.').last.toLowerCase();
+        String mimeType = 'image/jpeg';
+        if (extension == 'png') {
+          mimeType = 'image/png';
+        } else if (extension == 'webp') {
+          mimeType = 'image/webp';
+        }
+
         request.files.add(
-          await http.MultipartFile.fromPath('evidencias', _photos[i].path),
+          await http.MultipartFile.fromPath(
+            'evidencias',
+            file.path,
+            filename: file.path.split('/').last,
+            contentType: MediaType.parse(mimeType),
+          ),
         );
-      }*/
+      }
 
-      //==============================
-// Imágenes
-//==============================
-for (int i = 0; i < _photos.length; i++) {
-  final file = _photos[i];
-
-  final extension = file.path.split('.').last.toLowerCase();
-
-  String mimeType = 'image/jpeg';
-
-  if (extension == 'png') {
-    mimeType = 'image/png';
-  } else if (extension == 'webp') {
-    mimeType = 'image/webp';
-  } else if (extension == 'jpg' || extension == 'jpeg') {
-    mimeType = 'image/jpeg';
-  }
-
-  request.files.add(
-    await http.MultipartFile.fromPath(
-      'evidencias',
-      file.path,
-      filename: file.path.split('/').last,
-      contentType: MediaType.parse(mimeType),
-    ),
-  );
-}
-
-      final streamedResponse = await request.send();
-
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 25));
       final response = await http.Response.fromStream(streamedResponse);
 
       debugPrint("STATUS: ${response.statusCode}");
@@ -296,31 +294,29 @@ for (int i = 0; i < _photos.length; i++) {
 
       if (!mounted) return;
 
-      setState(() {
-        _saving = false;
-      });
-
       if (response.statusCode == 200 || response.statusCode == 201) {
+        setState(() {
+          _saving = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Observación guardada exitosamente'),
-            backgroundColor: const Color.fromARGB(255, 7, 83, 11),
+            backgroundColor: Color.fromARGB(255, 7, 83, 11),
           ),
         );
 
         Navigator.popUntil(context, (route) => route.isFirst);
+      } else if (response.statusCode >= 500) {
+        await _saveToOfflineQueue(clientUuid);
       } else {
         setState(() {
+          _saving = false;
           _errorMessage = response.body;
         });
       }
     } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _saving = false;
-        _errorMessage = e.toString();
-      });
+      debugPrint('>>> Error de red en ObservationFormScreen, guardando offline: $e');
+      await _saveToOfflineQueue(clientUuid);
     }
   }
 
@@ -587,7 +583,7 @@ for (int i = 0; i < _photos.length; i++) {
               IconButton(
                 icon: const Icon(
                   Icons.check_circle,
-                  color: const Color.fromARGB(255, 7, 83, 11),
+                  color: Color.fromARGB(255, 7, 83, 11),
                   size: 28,
                 ),
                 onPressed: _saveObservation,

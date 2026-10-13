@@ -83,7 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       barrierColor: const Color(0x73000000),
       builder: (ctx) => PermissionDialog(
         icon: Icons.location_on,
-        titleAppName: 'Monitoreo Duende',
+        titleAppName: 'Goblin Park',
         description: 'acceda a la ubicación de este dispositivo para georreferenciar los reportes de flora y avistamientos en tiempo real?',
         onReject: () {
           Navigator.pop(ctx);
@@ -104,7 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       barrierColor: const Color(0x73000000),
       builder: (ctx) => PermissionDialog(
         icon: Icons.camera_alt_rounded,
-        titleAppName: 'Monitoreo Duende',
+        titleAppName: 'Goblin Park',
         description: 'acceda a la cámara para tomar fotografías y evidencias de los especímenes durante los recorridos?',
         onReject: () {
           Navigator.pop(ctx);

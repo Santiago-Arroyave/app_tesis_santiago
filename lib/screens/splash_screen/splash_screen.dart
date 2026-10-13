@@ -54,50 +54,103 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0D2319),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 🌄 Fondo unificado con el Login
-          Image.asset('assets/images/Fondo-Login.png', fit: BoxFit.cover),
-
-          // 🌑 Capa oscura de contraste
-          Container(color: const Color(0x66000000)),
-
-          // 🌿 Logo centrado y marca
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset('assets/images/Logo Blanco.png', width: 200),
-
-                const SizedBox(height: 20),
-
-                const Text(
-                  "GoblinPark",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
+          // 🌄 Fondo de frailejones
+          Image.asset(
+            'assets/images/Fondo-Login.png',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: const Color(0xFF0D2319),
             ),
           ),
 
-          // 🔄 Loader sutil abajo
-          const Positioned(
-            bottom: 40,
+          // 🌲 Overlay / Degradado en verde bosque oscuro profundo (#0d2319 / #143324)
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF0D2319).withValues(alpha: 0.78),
+                  const Color(0xFF143324).withValues(alpha: 0.75),
+                  const Color(0xFF0D2319).withValues(alpha: 0.85),
+                ],
+              ),
+            ),
+          ),
+
+          // 🌿 Composición central: Logo circular blanco + Título + Subtítulo
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/Logo Blanco.png',
+                    width: 155,
+                    height: 155,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 22),
+                  const Text(
+                    'GoblinPark',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Monitoreo del Páramo del Duende',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 🔄 Pie de pantalla: Spinner sutil + "Preparando la aplicación..."
+          Positioned(
+            bottom: 42,
             left: 0,
             right: 0,
-            child: Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Preparando la aplicación...',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.68),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -10,11 +10,8 @@ import 'package:latlong2/latlong.dart' hide Path;
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:goblink_park/screens/main_map/map_filter_sheet.dart';
-import 'package:goblink_park/screens/observations/my_observations_screen.dart';
-import 'package:goblink_park/screens/observations/observation_form_screen.dart';
-import 'package:goblink_park/screens/profile/notifications_screen.dart';
-import 'package:goblink_park/screens/projects/project_screen.dart';
 import 'package:goblink_park/screens/reports/report_detail_screen.dart';
+import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 enum MapLayerType { satellite, topographic, standard }
 
@@ -28,10 +25,11 @@ class HomeMapScreen extends StatefulWidget {
 class _HomeMapScreenState extends State<HomeMapScreen>
     with TickerProviderStateMixin {
   static const _baseUrl = ApiConfig.baseUrl;
-  static const _defaultCenter = LatLng(3.9123, -76.6721); // PNR Páramo del Duende
+  static const _defaultCenter = LatLng(4.1151, -76.1976); // PNR Páramo del Duende
 
   List<dynamic> _reportes = [];
-  bool _isLoading = true;
+  List<dynamic> _categorias = [];
+  bool _isSyncing = false;
   LatLng? _currentLocation;
   StreamSubscription<Position>? _positionSubscription;
 
@@ -45,13 +43,14 @@ class _HomeMapScreenState extends State<HomeMapScreen>
   // Reporte seleccionado actualmente en el mapa
   Map<String, dynamic>? _selectedReporte;
 
-  // Estado de expansión del panel de accesos rápidos
-  bool _isQuickActionsExpanded = true;
-
   @override
   void initState() {
     super.initState();
-    _loadReportes();
+    // Iniciar las consultas de datos en paralelo sin bloquear el renderizado del mapa
+    Future.microtask(() {
+      _loadReportes();
+      _loadCategorias();
+    });
     _getCurrentLocation();
     _startLocationTracking();
   }
@@ -64,15 +63,17 @@ class _HomeMapScreenState extends State<HomeMapScreen>
   }
 
   Future<void> _loadReportes() async {
+    debugPrint('>>> GET Reportes en Mapa solicitado');
+    if (mounted) setState(() => _isSyncing = true);
     try {
       final token = await AuthService.getToken();
       final response = await http.get(
         Uri.parse('$_baseUrl/api/reportes'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
+          if (token != null) 'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 7));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
@@ -88,13 +89,41 @@ class _HomeMapScreenState extends State<HomeMapScreen>
           _reportes = data
               .where((r) => r['latitud'] != null && r['longitud'] != null)
               .toList();
-          _isLoading = false;
+          _isSyncing = false;
         });
       } else {
-        setState(() => _isLoading = false);
+        setState(() => _isSyncing = false);
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Error al cargar reportes en mapa: $e');
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
+  Future<void> _loadCategorias() async {
+    debugPrint('>>> GET Categorias en Mapa solicitado');
+    try {
+      final token = await AuthService.getToken();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/categorias'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 7));
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body is List) {
+          setState(() {
+            _categorias = body
+                .where((c) => c['estado'] == null || c['estado'] == true)
+                .toList();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error al cargar categorías en mapa: $e');
     }
   }
 
@@ -117,8 +146,21 @@ class _HomeMapScreenState extends State<HomeMapScreen>
         return;
       }
 
+      // 1. Obtener última posición conocida de forma instantánea si existe
+      try {
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null && mounted) {
+          final loc = LatLng(lastKnown.latitude, lastKnown.longitude);
+          setState(() => _currentLocation = loc);
+        }
+      } catch (_) {}
+
+      // 2. Obtener posición GPS actual con límite de tiempo para no congelar la pantalla
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 6),
+        ),
       );
 
       if (!mounted) return;
@@ -543,70 +585,75 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(10),
+      builder: (ctx) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              "Capa del Mapa",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F3A22),
+              const SizedBox(height: 14),
+              Text(
+                "Capa del Mapa",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _buildLayerItem(
-              title: "Satelital (Alta Resolución)",
-              subtitle: "Esri World Imagery – Vegetación y relieve real",
-              icon: Icons.satellite_alt_rounded,
-              isSelected: _currentMapLayer == MapLayerType.satellite,
-              onTap: () {
-                setState(() => _currentMapLayer = MapLayerType.satellite);
-                Navigator.pop(ctx);
-              },
-            ),
-            _buildLayerItem(
-              title: "Relieve / Topográfico",
-              subtitle: "Esri World Topo – Curvas de nivel del páramo",
-              icon: Icons.terrain_rounded,
-              isSelected: _currentMapLayer == MapLayerType.topographic,
-              onTap: () {
-                setState(() => _currentMapLayer = MapLayerType.topographic);
-                Navigator.pop(ctx);
-              },
-            ),
-            _buildLayerItem(
-              title: "Estándar / Calles",
-              subtitle: "OpenStreetMap – Senderos y caminos principales",
-              icon: Icons.map_rounded,
-              isSelected: _currentMapLayer == MapLayerType.standard,
-              onTap: () {
-                setState(() => _currentMapLayer = MapLayerType.standard);
-                Navigator.pop(ctx);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+              const SizedBox(height: 12),
+              _buildLayerItem(
+                title: "Satelital (Alta Resolución)",
+                subtitle: "Esri World Imagery – Vegetación y relieve real",
+                icon: Icons.satellite_alt_rounded,
+                isSelected: _currentMapLayer == MapLayerType.satellite,
+                onTap: () {
+                  setState(() => _currentMapLayer = MapLayerType.satellite);
+                  Navigator.pop(ctx);
+                },
+              ),
+              _buildLayerItem(
+                title: "Relieve / Topográfico",
+                subtitle: "Esri World Topo – Curvas de nivel del páramo",
+                icon: Icons.terrain_rounded,
+                isSelected: _currentMapLayer == MapLayerType.topographic,
+                onTap: () {
+                  setState(() => _currentMapLayer = MapLayerType.topographic);
+                  Navigator.pop(ctx);
+                },
+              ),
+              _buildLayerItem(
+                title: "Estándar / Calles",
+                subtitle: "OpenStreetMap – Senderos y caminos principales",
+                icon: Icons.map_rounded,
+                isSelected: _currentMapLayer == MapLayerType.standard,
+                onTap: () {
+                  setState(() => _currentMapLayer = MapLayerType.standard);
+                  Navigator.pop(ctx);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -617,29 +664,52 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final bgColor = isSelected
+        ? (isDark ? const Color(0xFF1B2620) : const Color(0xFFE8F5E9))
+        : (isDark ? const Color(0xFF222E27) : const Color(0xFFF9FAFB));
+    final borderColor = isSelected
+        ? (isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A))
+        : (isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB));
+    final iconColor = isSelected
+        ? (isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A))
+        : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280));
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFE8F5E9) : const Color(0xFFF9FAFB),
+        color: bgColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isSelected ? const Color(0xFF1E5E3A) : const Color(0xFFE5E7EB),
+          color: borderColor,
           width: isSelected ? 1.5 : 1.0,
         ),
       ),
       child: ListTile(
-        leading: Icon(icon, color: isSelected ? const Color(0xFF1E5E3A) : const Color(0xFF6B7280)),
+        leading: Icon(icon, color: iconColor),
         title: Text(
           title,
           style: TextStyle(
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
             fontSize: 14,
-            color: isSelected ? const Color(0xFF0F3A22) : const Color(0xFF1F2937),
+            color: theme.colorScheme.onSurface,
           ),
         ),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 11.5,
+            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+          ),
+        ),
         trailing: isSelected
-            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF1E5E3A), size: 22)
+            ? Icon(
+                Icons.check_circle_rounded,
+                color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+                size: 22,
+              )
             : null,
         onTap: onTap,
       ),
@@ -660,249 +730,52 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     );
   }
 
-  void _showSueloAguaSelector() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              "Seleccionar Tipo de Reporte",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F3A22),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ObservationFormScreen(
-                            location: _currentLocation ?? _defaultCenter,
-                            category: 'Suelo',
-                          ),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAF5F0),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF8C5E48), width: 1.2),
-                      ),
-                      child: const Column(
-                        children: [
-                          Icon(Icons.landscape, color: Color(0xFF8C5E48), size: 32),
-                          SizedBox(height: 8),
-                          Text(
-                            "Suelo",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF8C5E48),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ObservationFormScreen(
-                            location: _currentLocation ?? _defaultCenter,
-                            category: 'Agua',
-                          ),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF2563EB), width: 1.2),
-                      ),
-                      child: const Column(
-                        children: [
-                          Icon(Icons.water_drop, color: Color(0xFF2563EB), size: 32),
-                          SizedBox(height: 8),
-                          Text(
-                            "Agua",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openMenuSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                ClipOval(
-                  child: Image.asset(
-                    'assets/images/Logo verde.png',
-                    width: 42,
-                    height: 42,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Monitoreo Duende",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F3A22),
-                      ),
-                    ),
-                    Text(
-                      "PNR Páramo del Duende",
-                      style: TextStyle(fontSize: 12, color: Color(0xFF2E4F3E)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const Divider(height: 28),
-            ListTile(
-              leading: const Icon(Icons.work_outline, color: Color(0xFF1E5E3A)),
-              title: const Text("Proyectos de Monitoreo", style: TextStyle(fontWeight: FontWeight.w600)),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProjectScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.notifications_none_rounded, color: Color(0xFF1E5E3A)),
-              title: const Text("Notificaciones y Solicitudes", style: TextStyle(fontWeight: FontWeight.w600)),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.refresh, color: Color(0xFF1E5E3A)),
-              title: const Text("Actualizar Reportes del Mapa", style: TextStyle(fontWeight: FontWeight.w600)),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () {
-                Navigator.pop(ctx);
-                _loadReportes();
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ===========================================================================
-  // WIDGETS DE CABECERA, BUSCADOR Y CHIPS DE FILTRO RÁPIDO
+  // CABECERA PRINCIPAL: GOBLIN PARK, RECARGA EN TIEMPO REAL Y NOTIFICACIONES
   // ===========================================================================
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
+        border: Border.all(
+          color: isDark ? const Color(0x1AFFFFFF) : Colors.transparent,
+          width: 1,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x1F000000),
+            color: isDark ? const Color(0x40000000) : const Color(0x1F000000),
             blurRadius: 14,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
+          // Botón de recarga en tiempo real
           IconButton(
-            icon: const Icon(Icons.menu, color: Color(0xFF0F3A22), size: 26),
-            onPressed: _openMenuSheet,
+            icon: Icon(
+              Icons.refresh,
+              color: isDark ? const Color(0xFF52B788) : const Color(0xFF0F3A22),
+              size: 26,
+            ),
+            tooltip: 'Actualizar reportes en tiempo real',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Actualizando reportes en tiempo real...'),
+                  duration: Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              _loadReportes();
+            },
           ),
           const SizedBox(width: 2),
           ClipOval(
@@ -914,94 +787,74 @@ class _HomeMapScreenState extends State<HomeMapScreen>
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "Monitoreo Duende",
+                  "Goblin Park",
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F3A22),
+                    color: isDark ? const Color(0xFFE8F5E9) : const Color(0xFF0F3A22),
                     letterSpacing: -0.3,
                   ),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 1),
                 Text(
                   "PNR Páramo del Duende",
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF2E4F3E),
+                    color: isDark ? const Color(0xFFA3B899) : const Color(0xFF2E4F3E),
                   ),
                 ),
               ],
             ),
           ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 26),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                  );
-                },
-              ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4.5),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1E5E3A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const NotificationBellButton(size: 26),
         ],
       ),
     );
   }
 
   Widget _buildSearchBar() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        border: Border.all(
+          color: isDark ? const Color(0x1AFFFFFF) : Colors.transparent,
+          width: 1,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x14000000),
+            color: isDark ? const Color(0x40000000) : const Color(0x14000000),
             blurRadius: 10,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: TextField(
         controller: _searchController,
         onChanged: (val) => setState(() => _searchQuery = val),
-        style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
+        style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface),
         decoration: InputDecoration(
           hintText: "Buscar reportes, lugares o coordenadas...",
           hintStyle: const TextStyle(
             fontSize: 13.5,
             color: Color(0xFF9CA3AF),
           ),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280), size: 22),
+          prefixIcon: Icon(
+            Icons.search,
+            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+            size: 22,
+          ),
           suffixIcon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1016,7 +869,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
               IconButton(
                 icon: Icon(
                   Icons.tune,
-                  color: _filters.hasActiveFilters ? const Color(0xFF1E5E3A) : const Color(0xFF6B7280),
+                  color: _filters.hasActiveFilters
+                      ? (isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A))
+                      : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
                   size: 20,
                 ),
                 onPressed: _showFullFilterModal,
@@ -1032,6 +887,64 @@ class _HomeMapScreenState extends State<HomeMapScreen>
 
   Widget _buildQuickCategoryChips() {
     final selCat = _filters.category;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final List<Widget> categoryChipWidgets = [];
+
+    // 1. Chip Todos
+    categoryChipWidgets.add(
+      _buildQuickChip(
+        label: "Todos",
+        count: _countTodos,
+        icon: null,
+        isSelected: selCat == null || selCat == 'Todas',
+        activeColor: const Color(0xFF1E5E3A),
+        onTap: () => _onQuickChipTapped(null),
+      ),
+    );
+    categoryChipWidgets.add(const SizedBox(width: 8));
+
+    // 2. Chips de Categorías dinámicas o por defecto
+    if (_categorias.isNotEmpty) {
+      for (final cat in _categorias) {
+        final nom = (cat['nombre'] ?? '').toString();
+        if (nom.trim().isEmpty) continue;
+        final count = _reportes.where((r) => _matchesCategory(r, nom)).length;
+        categoryChipWidgets.add(
+          _buildQuickChip(
+            label: nom,
+            count: count,
+            icon: _getCategoryIcon(nom),
+            isSelected: selCat == nom,
+            activeColor: _getCategoryPinColor(nom),
+            onTap: () => _onQuickChipTapped(nom),
+          ),
+        );
+        categoryChipWidgets.add(const SizedBox(width: 8));
+      }
+    } else {
+      final defaultList = [
+        ('Flora', _countFlora, Icons.eco, const Color(0xFF1E5E3A)),
+        ('Fauna', _countFauna, Icons.pets, const Color(0xFF9A6735)),
+        ('Suelo', _countSuelo, Icons.landscape, const Color(0xFF8C5E48)),
+        ('Agua', _countAgua, Icons.water_drop, const Color(0xFF2563EB)),
+        ('Aire', _countAire, Icons.air, const Color(0xFF0284C7)),
+      ];
+      for (final item in defaultList) {
+        categoryChipWidgets.add(
+          _buildQuickChip(
+            label: item.$1,
+            count: item.$2,
+            icon: item.$3,
+            isSelected: selCat == item.$1,
+            activeColor: item.$4,
+            onTap: () => _onQuickChipTapped(item.$1),
+          ),
+        );
+        categoryChipWidgets.add(const SizedBox(width: 8));
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.only(top: 8.0),
@@ -1040,71 +953,7 @@ class _HomeMapScreenState extends State<HomeMapScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: [
-            // 1. Todos
-            _buildQuickChip(
-              label: "Todos",
-              count: _countTodos,
-              icon: null,
-              isSelected: selCat == null || selCat == 'Todas',
-              activeColor: const Color(0xFF1E5E3A),
-              onTap: () => _onQuickChipTapped(null),
-            ),
-            const SizedBox(width: 8),
-
-            // 2. Flora
-            _buildQuickChip(
-              label: "Flora",
-              count: _countFlora,
-              icon: Icons.eco,
-              isSelected: selCat == 'Flora',
-              activeColor: const Color(0xFF1E5E3A),
-              onTap: () => _onQuickChipTapped('Flora'),
-            ),
-            const SizedBox(width: 8),
-
-            // 3. Fauna
-            _buildQuickChip(
-              label: "Fauna",
-              count: _countFauna,
-              icon: Icons.pets,
-              isSelected: selCat == 'Fauna',
-              activeColor: const Color(0xFF9A6735),
-              onTap: () => _onQuickChipTapped('Fauna'),
-            ),
-            const SizedBox(width: 8),
-
-            // 4. Suelo
-            _buildQuickChip(
-              label: "Suelo",
-              count: _countSuelo,
-              icon: Icons.landscape,
-              isSelected: selCat == 'Suelo',
-              activeColor: const Color(0xFF8C5E48),
-              onTap: () => _onQuickChipTapped('Suelo'),
-            ),
-            const SizedBox(width: 8),
-
-            // 5. Agua
-            _buildQuickChip(
-              label: "Agua",
-              count: _countAgua,
-              icon: Icons.water_drop,
-              isSelected: selCat == 'Agua',
-              activeColor: const Color(0xFF2563EB),
-              onTap: () => _onQuickChipTapped('Agua'),
-            ),
-            const SizedBox(width: 8),
-
-            // 6. Aire
-            _buildQuickChip(
-              label: "Aire",
-              count: _countAire,
-              icon: Icons.air,
-              isSelected: selCat == 'Aire',
-              activeColor: const Color(0xFF0284C7),
-              onTap: () => _onQuickChipTapped('Aire'),
-            ),
-            const SizedBox(width: 8),
+            ...categoryChipWidgets,
 
             // 7. Botón desplegable / ajustes de filtros completos
             InkWell(
@@ -1113,10 +962,12 @@ class _HomeMapScreenState extends State<HomeMapScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: _filters.hasActiveFilters ? const Color(0xFF1E5E3A) : const Color(0xFFE5E7EB),
+                    color: _filters.hasActiveFilters
+                        ? (isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A))
+                        : (isDark ? const Color(0x26FFFFFF) : const Color(0xFFE5E7EB)),
                     width: _filters.hasActiveFilters ? 1.5 : 1.0,
                   ),
                   boxShadow: const [
@@ -1133,13 +984,15 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                     Icon(
                       Icons.tune,
                       size: 15,
-                      color: _filters.hasActiveFilters ? const Color(0xFF1E5E3A) : const Color(0xFF4B5563),
+                      color: _filters.hasActiveFilters
+                          ? (isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A))
+                          : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563)),
                     ),
                     const SizedBox(width: 3),
-                    const Icon(
+                    Icon(
                       Icons.keyboard_arrow_down,
                       size: 16,
-                      color: Color(0xFF4B5563),
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
                     ),
                   ],
                 ),
@@ -1159,6 +1012,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     required Color activeColor,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1168,10 +1024,12 @@ class _HomeMapScreenState extends State<HomeMapScreen>
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
           decoration: BoxDecoration(
-            color: isSelected ? activeColor : Colors.white,
+            color: isSelected ? activeColor : theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected ? activeColor : const Color(0xFFE5E7EB),
+              color: isSelected
+                  ? activeColor
+                  : (isDark ? const Color(0x26FFFFFF) : const Color(0xFFE5E7EB)),
               width: 1.1,
             ),
             boxShadow: const [
@@ -1198,14 +1056,18 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                  color: isSelected ? Colors.white : const Color(0xFF374151),
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? const Color(0xFFE8F5E9) : const Color(0xFF374151)),
                 ),
               ),
               const SizedBox(width: 5),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.white.withAlpha(50) : const Color(0xFFF3F4F6),
+                  color: isSelected
+                      ? Colors.white.withAlpha(50)
+                      : (isDark ? const Color(0xFF222E27) : const Color(0xFFF3F4F6)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -1213,7 +1075,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : const Color(0xFF4B5563),
+                    color: isSelected
+                        ? Colors.white
+                        : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563)),
                   ),
                 ),
               ),
@@ -1234,9 +1098,14 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     required String tooltip,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Material(
-      color: Colors.white,
-      shape: const CircleBorder(),
+      color: theme.colorScheme.surface,
+      shape: CircleBorder(
+        side: isDark ? const BorderSide(color: Color(0x26FFFFFF), width: 1) : BorderSide.none,
+      ),
       elevation: 3,
       shadowColor: const Color(0x26000000),
       child: InkWell(
@@ -1260,21 +1129,28 @@ class _HomeMapScreenState extends State<HomeMapScreen>
   // ===========================================================================
 
   Widget _buildLocationCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     final latStr = _currentLocation != null
         ? '${_currentLocation!.latitude.toStringAsFixed(4)}° N, ${_currentLocation!.longitude.toStringAsFixed(4)}° W'
-        : '3.9123° N, 76.6721° W';
+        : '4.1151° N, 76.1976° W';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
+        border: Border.all(
+          color: isDark ? const Color(0x26FFFFFF) : Colors.transparent,
+          width: 1,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x1A000000),
+            color: isDark ? const Color(0x40000000) : const Color(0x1A000000),
             blurRadius: 12,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1292,8 +1168,8 @@ class _HomeMapScreenState extends State<HomeMapScreen>
             Container(
               width: 36,
               height: 36,
-              decoration: const BoxDecoration(
-                color: Color(0xFFEFF6FF),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -1308,27 +1184,31 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     "Tu ubicación actual",
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF111827),
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     "PNR Páramo del Duende · $latStr",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF4B5563),
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
                       height: 1.2,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF), size: 22),
+            Icon(
+              Icons.chevron_right,
+              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF9CA3AF),
+              size: 22,
+            ),
           ],
         ),
       ),
@@ -1340,6 +1220,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
   // ===========================================================================
 
   Widget _buildSelectedReportCard(Map<String, dynamic> r) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     final catNombre = r['categoriaNombre'] ?? r['categoria']?['nombre'] ?? 'Flora';
     final estadoNombre = r['estadoReporteNombre'] ?? r['estado']?['nombre'] ?? 'Validado';
     final prioridadNombre = r['prioridadNombre'] ?? r['prioridad']?['nombre'] ?? 'Media';
@@ -1353,21 +1236,24 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     final Uint8List? imgBytes = imgUrl == null ? _getObservationImage(r) : null;
     final catColor = _getCategoryPinColor(catNombre);
     final statusColor = _getStatusColor(estadoNombre);
-    final statusBgColor = _getStatusBgColor(estadoNombre);
+    final statusBgColor = isDark ? statusColor.withAlpha(40) : _getStatusBgColor(estadoNombre);
     final prioColor = _getPriorityColor(prioridadNombre);
-    final prioBgColor = _getPriorityBgColor(prioridadNombre);
+    final prioBgColor = isDark ? prioColor.withAlpha(40) : _getPriorityBgColor(prioridadNombre);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
-        boxShadow: const [
+        border: Border.all(
+          color: isDark ? const Color(0x26FFFFFF) : const Color(0xFFE5E7EB),
+          width: 1.2,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x22000000),
+            color: isDark ? const Color(0x50000000) : const Color(0x22000000),
             blurRadius: 16,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1392,7 +1278,10 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                         ? CachedNetworkImage(
                             imageUrl: imgUrl,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(color: Colors.grey[200]),
+                            memCacheWidth: 600,
+                            placeholder: (context, url) => Container(
+                              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                            ),
                             errorWidget: (context, url, error) => Image.asset(
                               _categoryAsset(catNombre),
                               fit: BoxFit.cover,
@@ -1509,10 +1398,10 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                         titulo,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF111827),
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -1520,17 +1409,17 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                       // Fecha y hora con icono de calendario pequeño
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.calendar_today_outlined,
                             size: 12,
-                            color: Color(0xFF6B7280),
+                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             fecha,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF6B7280),
+                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1541,10 +1430,10 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                       // Ubicación con icono de pin pequeño
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.place_outlined,
                             size: 13,
-                            color: Color(0xFF6B7280),
+                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                           ),
                           const SizedBox(width: 4),
                           Expanded(
@@ -1552,9 +1441,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                               sector,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11.5,
-                                color: Color(0xFF4B5563),
+                                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
                               ),
                             ),
                           ),
@@ -1582,232 +1471,16 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                         ),
                       ),
                       // Flecha hacia la derecha como indicador visual de navegación
-                      const Icon(
+                      Icon(
                         Icons.chevron_right_rounded,
                         size: 24,
-                        color: Color(0xFF374151),
+                        color: isDark ? const Color(0xFFE8F5E9) : const Color(0xFF374151),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // PANEL INFERIOR DE ACCIONES RÁPIDAS (CON ARRASTRE Y COLAPSO)
-  // ===========================================================================
-
-  Widget _buildQuickActionPanel() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8FAF9),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 16,
-            offset: Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Barra de arrastre (drag handle) para expandir o contraer
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onVerticalDragEnd: (details) {
-              if (details.primaryVelocity != null) {
-                if (details.primaryVelocity! > 200) {
-                  setState(() => _isQuickActionsExpanded = false);
-                } else if (details.primaryVelocity! < -200) {
-                  setState(() => _isQuickActionsExpanded = true);
-                }
-              }
-            },
-            onTap: () {
-              setState(() => _isQuickActionsExpanded = !_isQuickActionsExpanded);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              width: double.infinity,
-              child: Column(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 4.5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD1D5DB),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  if (!_isQuickActionsExpanded) ...[
-                    const SizedBox(height: 5),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.keyboard_arrow_up, size: 16, color: Color(0xFF1E5E3A)),
-                        SizedBox(width: 4),
-                        Text(
-                          "Accesos rápidos de reporte",
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E5E3A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-
-          // Contenido de botones rápidos (visible solo si está expandido)
-          if (_isQuickActionsExpanded)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  children: [
-                    _buildQuickActionCard(
-                      title: "Reportar\nFlora",
-                      icon: Icons.eco,
-                      iconColor: const Color(0xFF1E5E3A),
-                      circleColor: const Color(0xFFE8F5E9),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ObservationFormScreen(
-                              location: _currentLocation ?? _defaultCenter,
-                              category: 'Flora',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _buildQuickActionCard(
-                      title: "Reportar\nAvistamiento",
-                      icon: Icons.pets,
-                      iconColor: const Color(0xFF9A6735),
-                      circleColor: const Color(0xFFFEF3C7),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ObservationFormScreen(
-                              location: _currentLocation ?? _defaultCenter,
-                              category: 'Fauna',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _buildQuickActionCard(
-                      title: "Reportar Aire\n/ Clima",
-                      icon: Icons.air,
-                      iconColor: const Color(0xFF0284C7),
-                      circleColor: const Color(0xFFE0F2FE),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ObservationFormScreen(
-                              location: _currentLocation ?? _defaultCenter,
-                              category: 'Aire',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _buildQuickActionCard(
-                      title: "Suelo /\nAgua",
-                      icon: Icons.landscape,
-                      iconColor: const Color(0xFF8C5E48),
-                      circleColor: const Color(0xFFF3E8FF),
-                      onTap: _showSueloAguaSelector,
-                    ),
-                    const SizedBox(width: 10),
-                    _buildQuickActionCard(
-                      title: "Mis\nReportes",
-                      icon: Icons.description_outlined,
-                      iconColor: const Color(0xFF0D9488),
-                      circleColor: const Color(0xFFE6F4EA),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const MyObservationsScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionCard({
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required Color circleColor,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      elevation: 1.5,
-      shadowColor: const Color(0x14000000),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: 90,
-          height: 88,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: circleColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F2937),
-                  height: 1.15,
-                ),
-              ),
-            ],
           ),
         ),
       ),
@@ -1934,6 +1607,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -1951,8 +1627,15 @@ class _HomeMapScreenState extends State<HomeMapScreen>
             ),
             children: [
               TileLayer(
+                key: ValueKey(_currentMapLayer),
                 urlTemplate: _getTileUrl(),
                 userAgentPackageName: 'com.example.app_tesis',
+                maxZoom: 19,
+                maxNativeZoom: _currentMapLayer == MapLayerType.standard ? 19 : 18,
+                keepBuffer: 3,
+                panBuffer: 1,
+                tileDisplay: const TileDisplay.fadeIn(duration: Duration(milliseconds: 150)),
+                evictErrorTileStrategy: EvictErrorTileStrategy.dispose,
               ),
               MarkerLayer(
                 markers: [
@@ -1985,32 +1668,50 @@ class _HomeMapScreenState extends State<HomeMapScreen>
             ],
           ),
 
-          // 2. Indicador de carga flotante
-          if (_isLoading)
+          // 2. Indicador sutil no bloqueante de sincronización de observaciones
+          if (_isSyncing)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 175,
+              top: MediaQuery.of(context).padding.top + 162,
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: (isDark ? const Color(0xFF1E2822) : Colors.white).withValues(alpha: 0.92),
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x1F000000), blurRadius: 8, offset: Offset(0, 2)),
+                    border: Border.all(
+                      color: isDark ? const Color(0x3352B788) : const Color(0x331E5E3A),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.14),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1E5E3A)),
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+                        ),
                       ),
-                      SizedBox(width: 8),
-                      Text('Cargando mapa...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Sincronizando observaciones...',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFFE8F5E9) : const Color(0xFF1E5E3A),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -2039,9 +1740,7 @@ class _HomeMapScreenState extends State<HomeMapScreen>
           // 4. Botones flotantes de control (lado derecho)
           Positioned(
             right: 16,
-            bottom: _selectedReporte != null
-                ? 135
-                : (_isQuickActionsExpanded ? 230 : 65),
+            bottom: _selectedReporte != null ? 140 : 85,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -2060,14 +1759,14 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                 const SizedBox(height: 10),
                 _buildFloatingControlButton(
                   icon: Icons.layers_outlined,
-                  iconColor: const Color(0xFF1E5E3A),
+                  iconColor: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
                   tooltip: "Capas de mapa",
                   onTap: _showLayersModal,
                 ),
                 const SizedBox(height: 10),
                 _buildFloatingControlButton(
                   icon: Icons.near_me_outlined,
-                  iconColor: const Color(0xFF0F3A22),
+                  iconColor: isDark ? const Color(0xFF52B788) : const Color(0xFF0F3A22),
                   tooltip: "Orientación norte",
                   onTap: () => _mapController.rotate(0),
                 ),
@@ -2075,21 +1774,16 @@ class _HomeMapScreenState extends State<HomeMapScreen>
             ),
           ),
 
-          // 5. Tarjeta de Preview de Reporte (al seleccionar un pin) O Panel de Accesos Rápidos
+          // 5. Tarjeta informativa de "Tu ubicación actual" O Tarjeta de Preview de Reporte (al seleccionar un pin)
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_selectedReporte != null)
-                  _buildSelectedReportCard(_selectedReporte!)
-                else ...[
-                  if (_isQuickActionsExpanded) _buildLocationCard(),
-                  _buildQuickActionPanel(),
-                ],
-              ],
+            child: SafeArea(
+              top: false,
+              child: _selectedReporte != null
+                  ? _buildSelectedReportCard(_selectedReporte!)
+                  : _buildLocationCard(),
             ),
           ),
         ],

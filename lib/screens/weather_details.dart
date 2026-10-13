@@ -100,6 +100,7 @@ class _WeatherDetailState extends State<WeatherDetails>
           children: [
             CachedNetworkImage(
               imageUrl: widget.weatherData.img_link,
+              memCacheWidth: 600,
               placeholder: (context, url) => Container(height: 150, color: Colors.grey.shade200),
               errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.grey),
             ),

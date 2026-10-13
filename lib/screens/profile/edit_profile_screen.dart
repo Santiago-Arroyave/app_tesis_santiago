@@ -69,12 +69,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       text: (u['sobreMi'] ?? u['sobre_mi'] ?? u['descripcion'])?.toString() ?? '',
     );
 
-    final rawFoto = u['fotoPerfil']?.toString();
+    final rawFoto = (u['fotoPerfilUrl'] ?? u['fotoPerfil'])?.toString();
     if (rawFoto != null && rawFoto.isNotEmpty) {
       _fotoPerfilUrl = rawFoto;
     }
 
-    final rawPortada = u['fotoPortada']?.toString();
+    final rawPortada = (u['fotoPortadaUrl'] ?? u['fotoPortada'])?.toString();
     if (rawPortada != null && rawPortada.isNotEmpty) {
       _fotoPortadaUrl = rawPortada;
     }
@@ -212,6 +212,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           width: double.infinity,
           height: 140,
           fit: BoxFit.cover,
+          memCacheWidth: 600,
           placeholder: (context, url) => Container(
             width: double.infinity,
             height: 140,
@@ -466,6 +467,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             width: 86,
             height: 86,
             fit: BoxFit.cover,
+            memCacheWidth: 600,
             placeholder: (context, url) => Container(
               width: 86,
               height: 86,

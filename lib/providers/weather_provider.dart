@@ -20,11 +20,11 @@ class WeatherProvider extends ChangeNotifier{
         weathers = List<Weather>.from(data['recipes']
         .map((recipe) => Weather.fromJSON(recipe)));
     }else{
-      print('Error ${response.statusCode}');
+      debugPrint('Error ${response.statusCode}');
       weathers = [];
     }
     } catch (e){
-      print('Error en la solicitud: $e' );
+      debugPrint('Error en la solicitud: $e');
       weathers = [];
     }finally{
       isLoading = false;
@@ -52,7 +52,7 @@ class WeatherProvider extends ChangeNotifier{
           throw Exception('Failed to Update favorite recipes');
         }
     }catch (e) {
-        print('Error updating favorite status $e');
+        debugPrint('Error updating favorite status $e');
     }
   }
 }

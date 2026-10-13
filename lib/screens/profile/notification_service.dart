@@ -11,6 +11,7 @@ class NotificationService {
     required int proyectoId,
     required String proyectoNombre,
     required String mensaje,
+    int? idSolicitud,
   }) async {
     final lista = await getSolicitudes();
     lista.removeWhere(
@@ -19,6 +20,7 @@ class NotificationService {
     lista.add({
       'usuarioId': usuarioId,
       'proyectoId': proyectoId,
+      'idSolicitud': idSolicitud,
       'proyectoNombre': proyectoNombre,
       'mensaje': mensaje,
       'estado': 'pendiente',
@@ -28,13 +30,28 @@ class NotificationService {
     await _storage.write(key: _key, value: jsonEncode(lista));
   }
 
+  // ── Cancelar solicitud enviada ─────────────────────────
+  static Future<void> cancelSolicitud({
+    required int usuarioId,
+    required int proyectoId,
+  }) async {
+    final lista = await getSolicitudes();
+    lista.removeWhere(
+      (s) => s['proyectoId'] == proyectoId && s['usuarioId'] == usuarioId,
+    );
+    await _storage.write(key: _key, value: jsonEncode(lista));
+  }
+
   // ── Actualizar estado según proyectos del usuario ──────
   static Future<void> updateEstados(
     List<dynamic> misProyectos,
     int usuarioId,
   ) async {
     final lista = await getSolicitudes();
-    final idsAceptados = misProyectos.map((p) => p['id'] as int).toSet();
+    final idsAceptados = misProyectos
+        .map((p) => (p['id'] as num?)?.toInt() ?? 0)
+        .where((id) => id > 0)
+        .toSet();
 
     for (final s in lista) {
       if (s['usuarioId'] != usuarioId) continue; // solo del usuario actual

@@ -113,7 +113,10 @@ class _ObservationEditScreenState extends State<ObservationEditScreen> {
     });
 
     try {
-      final token = await AuthService.getToken();
+      final token = await AuthStorage.getToken();
+      final cleanToken = (token ?? '').trim().startsWith('Bearer ')
+          ? (token ?? '').trim().substring(7).trim()
+          : (token ?? '').trim();
       final id = widget.obs['id'];
 
       // ── 1. PUT incluyendo evidencias existentes ───────────
@@ -141,7 +144,7 @@ class _ObservationEditScreenState extends State<ObservationEditScreen> {
         Uri.parse('$_baseUrl/api/reportes/$id'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $cleanToken',
         },
         body: jsonEncode(bodyMap),
       );
@@ -552,6 +555,7 @@ class _ObservationEditScreenState extends State<ObservationEditScreen> {
                           ? CachedNetworkImage(
                               imageUrl: urlArchivo,
                               fit: BoxFit.cover,
+                              memCacheWidth: 600,
                               placeholder: (context, url) => Container(
                                 color: Colors.grey.shade200,
                                 child: const Center(
@@ -750,7 +754,7 @@ class ObservationEditScreen extends StatefulWidget {
 }
 
 class _ObservationEditScreenState extends State<ObservationEditScreen> {
-  static const _baseUrl = 'http://10.0.2.2:8080';
+  static const _baseUrl = ApiConfig.baseUrl;
 
   late TextEditingController _tituloController;
   late TextEditingController _descController;

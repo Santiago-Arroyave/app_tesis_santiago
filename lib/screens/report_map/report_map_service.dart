@@ -601,7 +601,7 @@ class _CreateReportSheetState extends State<_CreateReportSheet> {
 
                     // ── Categoría ───────────────────────────
                     DropdownButtonFormField<int>(
-                      value: _selectedCategoriaId,
+                      initialValue: _selectedCategoriaId,
                       decoration: const InputDecoration(
                         labelText: 'Categoría *',
                         border: OutlineInputBorder(),
@@ -621,7 +621,7 @@ class _CreateReportSheetState extends State<_CreateReportSheet> {
 
                     // ── Prioridad ───────────────────────────
                     DropdownButtonFormField<int>(
-                      value: _selectedPrioridadId,
+                      initialValue: _selectedPrioridadId,
                       decoration: const InputDecoration(
                         labelText: 'Prioridad *',
                         border: OutlineInputBorder(),
@@ -641,7 +641,7 @@ class _CreateReportSheetState extends State<_CreateReportSheet> {
 
                     // ── Estado ──────────────────────────────
                     DropdownButtonFormField<int>(
-                      value: _selectedEstadoId,
+                      initialValue: _selectedEstadoId,
                       decoration: const InputDecoration(
                         labelText: 'Estado *',
                         border: OutlineInputBorder(),

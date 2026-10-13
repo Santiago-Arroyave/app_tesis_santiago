@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:goblink_park/screens/profile/notifications_screen.dart';
+import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 class PermissionsScreen extends StatefulWidget {
   const PermissionsScreen({super.key});
@@ -202,7 +202,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "Monitoreo Duende",
+                  "Goblin Park",
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
@@ -222,15 +222,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F3A22), size: 25),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-          ),
+          const NotificationBellButton(size: 25),
         ],
       ),
     );

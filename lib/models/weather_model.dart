@@ -2,6 +2,7 @@ class Weather{
   int id;
   String name;
   String author;
+  // ignore: non_constant_identifier_names
   String img_link;
   List<String> recipeSteps;
 
