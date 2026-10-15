@@ -205,124 +205,134 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(10),
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewPadding.bottom + 16,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(
-                  Icons.help_outline_rounded,
-                  color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
-                  size: 22,
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.help_outline_rounded,
+                    color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Ayuda y Soporte Institucional",
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "PNR Páramo del Duende - Plataforma GoblinPark",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurface,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  "Ayuda y Soporte Institucional",
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "Para asistencia técnica en campo, reporte de anomalías o dudas sobre protocolos de monitoreo, comunícate con nuestro equipo:",
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                  child: const Icon(Icons.mail_outline, color: Color(0xFF2563EB)),
+                ),
+                title: Text(
+                  "santiago.arroyave01@uceva.edu.co",
                   style: TextStyle(
-                    fontSize: 17,
                     fontWeight: FontWeight.bold,
+                    fontSize: 13,
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "PNR Páramo del Duende - Plataforma GoblinPark",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              "Para asistencia técnica en campo, reporte de anomalías o dudas sobre protocolos de monitoreo, comunícate con nuestro equipo:",
-              style: TextStyle(
-                fontSize: 12.5,
-                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
-              ),
-            ),
-            const SizedBox(height: 14),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                child: const Icon(Icons.mail_outline, color: Color(0xFF2563EB)),
-              ),
-              title: Text(
-                "soporte@goblinpark.gov.co",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface,
+                subtitle: Text(
+                  "Atención técnica y científica",
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                  ),
                 ),
               ),
-              subtitle: Text(
-                "Atención técnica y científica 24/7",
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: isDark ? const Color(0xFF1B4332) : const Color(0xFFE8F5E9),
+                  child: Icon(
+                    Icons.phone_outlined,
+                    color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+                  ),
+                ),
+                title: Text(
+                  "+57 (315) 338-2089",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                subtitle: Text(
+                  "Línea de soporte Guardabosques",
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                  ),
                 ),
               ),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: isDark ? const Color(0xFF1B4332) : const Color(0xFFE8F5E9),
-                child: Icon(
-                  Icons.phone_outlined,
-                  color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? const Color(0xFF2D6A4F) : const Color(0xFF1E5E3A),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Cerrar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ),
-              title: Text(
-                "+57 (602) 224-5500",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              subtitle: Text(
-                "Línea de emergencia Guardabosques",
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? const Color(0xFF2D6A4F) : const Color(0xFF1E5E3A),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text("Cerrar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -589,7 +599,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           ClipOval(
             child: Image.asset(
-              'assets/images/Logo verde.png',
+              isDark
+                  ? 'assets/images/Logo Blanco.png'
+                  : 'assets/images/Logo verde.png',
               width: 38,
               height: 38,
               fit: BoxFit.contain,

@@ -390,15 +390,19 @@ class _ReviewReportScreenState extends State<ReviewReportScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Color(0xFF0F3A22)),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: isDark ? Colors.white : const Color(0xFF0F3A22),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "Confirmar reporte",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F3A22),
+            color: isDark ? Colors.white : const Color(0xFF0F3A22),
           ),
         ),
         centerTitle: true,
@@ -412,7 +416,7 @@ class _ReviewReportScreenState extends State<ReviewReportScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStepIndicator(4, "Confirmar la información"),
+                    _buildStepIndicator(4, "Confirmar la información", isDark: isDark),
                     const SizedBox(height: 12),
                     Text(
                       "Revisa tu observación",
@@ -467,7 +471,7 @@ class _ReviewReportScreenState extends State<ReviewReportScreen> {
     );
   }
 
-  Widget _buildStepIndicator(int currentStep, String stepTitle) {
+  Widget _buildStepIndicator(int currentStep, String stepTitle, {bool isDark = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -476,7 +480,9 @@ class _ReviewReportScreenState extends State<ReviewReportScreen> {
             final stepNum = index + 1;
             final isDone = stepNum < currentStep;
             final isCurrent = stepNum == currentStep;
-            final color = isDone || isCurrent ? const Color(0xFF1E5E3A) : const Color(0xFFD1D5DB);
+            final color = isDone || isCurrent
+                ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A))
+                : (isDark ? const Color(0xFF374151) : const Color(0xFFD1D5DB));
 
             return Expanded(
               child: Container(
@@ -493,10 +499,10 @@ class _ReviewReportScreenState extends State<ReviewReportScreen> {
         const SizedBox(height: 8),
         Text(
           "Paso $currentStep de 4 • $stepTitle",
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E5E3A),
+            color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A),
           ),
         ),
       ],

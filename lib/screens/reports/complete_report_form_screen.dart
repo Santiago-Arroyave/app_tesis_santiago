@@ -376,15 +376,15 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Color(0xFF0F3A22)),
+          icon: Icon(Icons.arrow_back_ios_new, size: 20, color: titleColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "Información del registro",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F3A22),
+            color: titleColor,
           ),
         ),
         centerTitle: true,
@@ -415,7 +415,7 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
                       const SizedBox(height: 16),
                       _buildCommonFields(cardBg, isDark, titleColor),
                       const SizedBox(height: 16),
-                      _buildPhotosSection(cardBg, isDark),
+                      _buildPhotosSection(cardBg, isDark, titleColor),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -430,6 +430,7 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
   }
 
   Widget _buildStepIndicator(int currentStep, String stepTitle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -455,10 +456,10 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
         const SizedBox(height: 8),
         Text(
           "Paso $currentStep de 4 • $stepTitle",
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E5E3A),
+            color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
           ),
         ),
       ],
@@ -514,9 +515,14 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                const Text(
+                Text(
                   "Completa los datos técnicos de tu observación",
-                  style: TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF9CA3AF)
+                        : const Color(0xFF4B5563),
+                  ),
                 ),
               ],
             ),
@@ -741,9 +747,9 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Selector de Prioridad
-        const Text(
+        Text(
           "Prioridad de atención *",
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: titleColor),
         ),
         const SizedBox(height: 6),
         Container(
@@ -794,9 +800,9 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
         const SizedBox(height: 14),
 
         // Fecha y Hora
-        const Text(
+        Text(
           "Fecha y hora del registro *",
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: titleColor),
         ),
         const SizedBox(height: 6),
         InkWell(
@@ -813,7 +819,11 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF1E5E3A)),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 18,
+                  color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A),
+                ),
                 const SizedBox(width: 10),
                 Text(
                   _formatDateTime(_selectedDateTime),
@@ -824,12 +834,12 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
                   ),
                 ),
                 const Spacer(),
-                const Text(
+                Text(
                   "Cambiar",
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E5E3A),
+                    color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A),
                   ),
                 ),
               ],
@@ -842,9 +852,9 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               "Descripción detallada *",
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: titleColor),
             ),
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: _descController,
@@ -900,16 +910,16 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
   // ==========================================
   // EVIDENCIAS FOTOGRÁFICAS
   // ==========================================
-  Widget _buildPhotosSection(Color cardBg, bool isDark) {
+  Widget _buildPhotosSection(Color cardBg, bool isDark, Color titleColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               "Evidencias fotográficas *",
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: titleColor),
             ),
             Text(
               "(${_photos.length}/5)",
@@ -949,17 +959,24 @@ class _CompleteReportFormScreenState extends State<CompleteReportFormScreen> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _pickImage(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined, size: 18, color: Color(0xFF1E5E3A)),
-                label: const Text(
+                icon: Icon(
+                  Icons.photo_library_outlined,
+                  size: 18,
+                  color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A),
+                ),
+                label: Text(
                   "Agregar foto",
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E5E3A),
+                    color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A),
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF1E5E3A), width: 1.2),
+                  side: BorderSide(
+                    color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A),
+                    width: 1.2,
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),

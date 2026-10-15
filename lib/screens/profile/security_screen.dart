@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:local_auth/local_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:goblink_park/widgets/notification_bell_button.dart';
@@ -26,7 +24,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
-  bool _biometricEnabled = false;
   bool _isUpdating = false;
   bool _showSuccessBanner = false;
 
@@ -35,7 +32,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBiometricPreference();
     _newPasswordController.addListener(() {
       setState(() {
         _newPassword = _newPasswordController.text;
@@ -50,79 +46,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadBiometricPreference() async {
-    final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getBool('biometrics_enabled') ?? false;
-    if (mounted) {
-      setState(() {
-        _biometricEnabled = value;
-      });
-    }
-  }
-
-  Future<void> _toggleBiometric(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (value) {
-      try {
-        final LocalAuthentication auth = LocalAuthentication();
-        final bool canCheck = await auth.canCheckBiometrics || await auth.isDeviceSupported();
-        if (canCheck) {
-          await prefs.setBool('biometrics_enabled', true);
-          if (!mounted) return;
-          setState(() {
-            _biometricEnabled = true;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Autenticación biométrica habilitada para este dispositivo."),
-              backgroundColor: Color(0xFF1E5E3A),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          await prefs.setBool('biometrics_enabled', false);
-          if (!mounted) return;
-          setState(() {
-            _biometricEnabled = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("El dispositivo no tiene biometría configurada o no es compatible."),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      } catch (e) {
-        await prefs.setBool('biometrics_enabled', false);
-        if (!mounted) return;
-        setState(() {
-          _biometricEnabled = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error al verificar biometría: $e"),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } else {
-      await prefs.setBool('biometrics_enabled', false);
-      if (!mounted) return;
-      setState(() {
-        _biometricEnabled = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Autenticación biométrica desactivada."),
-          backgroundColor: Color(0xFF1E5E3A),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
   void _scrollToPasswordForm() {
@@ -358,7 +281,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     final hasSpecialChar = RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(_newPassword);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           controller: _scrollController,
@@ -406,24 +329,32 @@ class _SecurityScreenState extends State<SecurityScreen> {
               ],
 
               // 2. Título de pantalla
-              const Text(
-                "Seguridad",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F3A22),
-                  letterSpacing: -0.4,
-                ),
-              ),
-              const SizedBox(height: 3),
-              const Text(
-                "Protege tu cuenta y administra las opciones de acceso a la aplicación.",
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF4B5563),
-                  height: 1.35,
-                ),
-              ),
+              Builder(builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Seguridad",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F3A22),
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      "Protege tu cuenta y administra las opciones de acceso a la aplicación.",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                );
+              }),
               const SizedBox(height: 16),
 
               // 3. Tarjetas de opciones de seguridad
@@ -448,10 +379,11 @@ class _SecurityScreenState extends State<SecurityScreen> {
   // ===========================================================================
 
   Widget _buildInstitutionalHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(22),
         boxShadow: const [
           BoxShadow(
@@ -464,19 +396,25 @@ class _SecurityScreenState extends State<SecurityScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F3A22), size: 20),
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: isDark ? Colors.white : const Color(0xFF0F3A22),
+              size: 20,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           ClipOval(
             child: Image.asset(
-              'assets/images/Logo verde.png',
+              isDark
+                  ? 'assets/images/Logo Blanco.png'
+                  : 'assets/images/Logo verde.png',
               width: 36,
               height: 36,
               fit: BoxFit.contain,
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -486,17 +424,17 @@ class _SecurityScreenState extends State<SecurityScreen> {
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F3A22),
+                    color: isDark ? Colors.white : const Color(0xFF0F3A22),
                     letterSpacing: -0.3,
                   ),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 1),
                 Text(
                   "PNR Páramo del Duende",
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF2E4F3E),
+                    color: isDark ? const Color(0xFFA3B899) : const Color(0xFF2E4F3E),
                   ),
                 ),
               ],
@@ -509,11 +447,14 @@ class _SecurityScreenState extends State<SecurityScreen> {
   }
 
   Widget _buildSecurityOptionsCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x08000000),
@@ -549,36 +490,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
           ),
           const Divider(height: 1, indent: 64, endIndent: 16),
 
-          // 2. Autenticación biométrica
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            leading: Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0xFFEFF6FF),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.fingerprint_rounded, color: Color(0xFF2563EB), size: 22),
-            ),
-            title: const Text(
-              "Autenticación biométrica",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
-            ),
-            subtitle: const Text(
-              "Acceso rápido con huella o rostro",
-              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-            ),
-            trailing: Switch(
-              value: _biometricEnabled,
-              activeThumbColor: const Color(0xFF1E5E3A),
-              activeTrackColor: const Color(0xFFDCFCE7),
-              onChanged: _toggleBiometric,
-            ),
-          ),
-          const Divider(height: 1, indent: 64, endIndent: 16),
-
-          // 3. Sesión activa
+          // 2. Sesión activa
           ListTile(
             onTap: _showActiveSessionDialog,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -611,12 +523,15 @@ class _SecurityScreenState extends State<SecurityScreen> {
     required bool hasLetterAndNumber,
     required bool hasSpecialChar,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x08000000),
@@ -630,24 +545,27 @@ class _SecurityScreenState extends State<SecurityScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.lock_reset_rounded, color: Color(0xFF1E5E3A), size: 22),
-                SizedBox(width: 8),
+                const Icon(Icons.lock_reset_rounded, color: Color(0xFF1E5E3A), size: 22),
+                const SizedBox(width: 8),
                 Text(
                   "Cambiar contraseña",
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F3A22),
+                    color: isDark ? Colors.white : const Color(0xFF0F3A22),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               "Ingresa tu clave actual y define una nueva que cumpla con los estándares de seguridad.",
-              style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -656,6 +574,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               label: "Contraseña actual *",
               controller: _currentPasswordController,
               obscureText: _obscureCurrent,
+              isDark: isDark,
               onToggleVisibility: () => setState(() => _obscureCurrent = !_obscureCurrent),
               validator: (v) => v == null || v.trim().isEmpty ? "Ingresa tu contraseña actual" : null,
             ),
@@ -666,6 +585,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               label: "Nueva contraseña *",
               controller: _newPasswordController,
               obscureText: _obscureNew,
+              isDark: isDark,
               onToggleVisibility: () => setState(() => _obscureNew = !_obscureNew),
               validator: (v) => v == null || v.trim().isEmpty ? "Ingresa la nueva contraseña" : null,
             ),
@@ -676,6 +596,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               label: "Confirmar nueva contraseña *",
               controller: _confirmPasswordController,
               obscureText: _obscureConfirm,
+              isDark: isDark,
               onToggleVisibility: () => setState(() => _obscureConfirm = !_obscureConfirm),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return "Confirma tu nueva contraseña";
@@ -689,16 +610,22 @@ class _SecurityScreenState extends State<SecurityScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
+                color: isDark ? const Color(0xFF121212) : const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     "Requisitos de seguridad:",
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF374151),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   _buildRequirementItem(
@@ -760,6 +687,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     required String label,
     required TextEditingController controller,
     required bool obscureText,
+    required bool isDark,
     required VoidCallback onToggleVisibility,
     String? Function(String?)? validator,
   }) {
@@ -767,27 +695,37 @@ class _SecurityScreenState extends State<SecurityScreen> {
       controller: controller,
       obscureText: obscureText,
       validator: validator,
-      style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
+      style: TextStyle(
+        fontSize: 14,
+        color: isDark ? Colors.white : const Color(0xFF111827),
+      ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+        labelStyle: TextStyle(
+          fontSize: 13,
+          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+        ),
         filled: true,
-        fillColor: const Color(0xFFF9FAFB),
+        fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF9FAFB),
         suffixIcon: IconButton(
           icon: Icon(
             obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-            color: const Color(0xFF6B7280),
+            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
             size: 20,
           ),
           onPressed: onToggleVisibility,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

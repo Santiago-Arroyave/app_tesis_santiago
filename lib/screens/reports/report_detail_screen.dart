@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:goblink_park/screens/reports/edit_report_screen.dart';
+import 'package:goblink_park/providers/map_focus_service.dart';
 import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 class ReportDetailScreen extends StatefulWidget {
@@ -213,20 +214,70 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     return Icons.eco;
   }
 
-  Color _getStatusColor(String? status) {
+  Color _getStatusColor(String? status, {bool isDark = false}) {
     final s = status?.toLowerCase() ?? '';
-    if (s.contains('valid') || s.contains('aprob')) return const Color(0xFF15803D);
+    // RESUELTO — verde institucional claro
+    if (s.contains('resuel')) {
+      return isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
+    }
+    // CONVERTIDO EN PROYECTO — azul índigo
+    if (s.contains('convert') || s.contains('proyecto')) {
+      return isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5);
+    }
+    // VALIDADO / APROBADO
+    if (s.contains('valid') || s.contains('aprob')) {
+      return const Color(0xFF15803D);
+    }
+    // EN REVISIÓN
     if (s.contains('revis')) return const Color(0xFFB45309);
+    // EN SEGUIMIENTO
     if (s.contains('seguim')) return const Color(0xFF0284C7);
+    // DESCARTADO
+    if (s.contains('descart') || s.contains('rechaz')) {
+      return const Color(0xFFDC2626);
+    }
+    // PENDIENTE
+    if (s.contains('pendient')) return const Color(0xFFB45309);
     return const Color(0xFF6B7280);
   }
 
-  Color _getStatusBgColor(String? status) {
+  Color _getStatusBgColor(String? status, {bool isDark = false}) {
     final s = status?.toLowerCase() ?? '';
-    if (s.contains('valid') || s.contains('aprob')) return const Color(0xFFDCFCE7);
-    if (s.contains('revis')) return const Color(0xFFFEF3C7);
-    if (s.contains('seguim')) return const Color(0xFFE0F2FE);
-    return const Color(0xFFF3F4F6);
+    // RESUELTO — fondo verde suave institucional
+    if (s.contains('resuel')) {
+      return isDark ? const Color(0x3322C55E) : const Color(0xFFDCFCE7);
+    }
+    // CONVERTIDO EN PROYECTO
+    if (s.contains('convert') || s.contains('proyecto')) {
+      return isDark ? const Color(0x334F46E5) : const Color(0xFFEEF2FF);
+    }
+    // VALIDADO / APROBADO
+    if (s.contains('valid') || s.contains('aprob')) return isDark ? const Color(0x3322C55E) : const Color(0xFFDCFCE7);
+    // EN REVISIÓN
+    if (s.contains('revis')) return isDark ? const Color(0x33F59E0B) : const Color(0xFFFEF3C7);
+    // EN SEGUIMIENTO
+    if (s.contains('seguim')) return isDark ? const Color(0x330284C7) : const Color(0xFFE0F2FE);
+    // DESCARTADO
+    if (s.contains('descart') || s.contains('rechaz')) {
+      return isDark ? const Color(0x33EF4444) : const Color(0xFFFEE2E2);
+    }
+    // PENDIENTE
+    if (s.contains('pendient')) return isDark ? const Color(0x33F59E0B) : const Color(0xFFFEF3C7);
+    return isDark ? const Color(0xFF262626) : const Color(0xFFF3F4F6);
+  }
+
+  Color _getStatusBorderColor(String? status, {bool isDark = false}) {
+    final s = status?.toLowerCase() ?? '';
+    if (s.contains('resuel')) {
+      return isDark ? const Color(0xFF22C55E) : const Color(0xFF166534);
+    }
+    if (s.contains('convert') || s.contains('proyecto')) {
+      return isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5);
+    }
+    if (s.contains('descart') || s.contains('rechaz')) {
+      return isDark ? const Color(0xFFEF4444) : const Color(0xFFDC2626);
+    }
+    return _getStatusColor(status, isDark: isDark).withAlpha(120);
   }
 
   String _formatDate(dynamic dateVal) {
@@ -304,6 +355,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final r = _reporte;
     final catNombre = r['categoriaNombre'] ?? r['categoria']?['nombre'] ?? 'Flora';
     final estadoNombre = r['estadoReporteNombre'] ?? r['estado']?['nombre'] ?? 'Validado';
@@ -316,25 +368,25 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF9FAFB),
-        bottomNavigationBar: _buildBottomBar(r),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        bottomNavigationBar: _buildBottomBar(r, isDark),
         body: SafeArea(
           bottom: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. Header Institucional Fijo
-              _buildInstitutionalHeader(),
+              _buildInstitutionalHeader(isDark),
 
               // 2. Título de la pantalla: "Detalle del reporte"
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
-                child: const Text(
+                child: Text(
                   "Detalle del reporte",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F3A22),
+                    color: isDark ? Colors.white : const Color(0xFF0F3A22),
                     letterSpacing: -0.4,
                   ),
                 ),
@@ -342,16 +394,21 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
               // 3. Barra de Pestañas: [Resumen], [Evidencias (N)], [Seguimiento]
               Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   border: Border(
-                    bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1.0),
+                    bottom: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFE5E7EB),
+                      width: 1.0,
+                    ),
                   ),
                 ),
                 child: TabBar(
                   indicatorColor: const Color(0xFF1E5E3A),
                   indicatorWeight: 3,
-                  labelColor: const Color(0xFF1E5E3A),
+                  labelColor: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
                   unselectedLabelColor: const Color(0xFF6B7280),
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                   unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13.5),
@@ -367,9 +424,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               Expanded(
                 child: TabBarView(
                   children: [
-                    _buildTabResumen(r, catNombre, estadoNombre, titulo),
-                    _buildTabEvidencias(),
-                    _buildTabSeguimiento(r, estadoNombre),
+                    _buildTabResumen(r, catNombre, estadoNombre, titulo, isDark),
+                    _buildTabEvidencias(isDark),
+                    _buildTabSeguimiento(r, estadoNombre, isDark),
                   ],
                 ),
               ),
@@ -384,12 +441,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   // HEADER INSTITUCIONAL FIJO
   // ===========================================================================
 
-  Widget _buildInstitutionalHeader() {
+  Widget _buildInstitutionalHeader(bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(22),
         boxShadow: const [
           BoxShadow(
@@ -402,20 +459,26 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3A22), size: 24),
+            icon: Icon(
+              Icons.arrow_back,
+              color: isDark ? Colors.white : const Color(0xFF0F3A22),
+              size: 24,
+            ),
             onPressed: () => Navigator.pop(context, _reporte),
           ),
           const SizedBox(width: 2),
           ClipOval(
             child: Image.asset(
-              'assets/images/Logo verde.png',
+              isDark
+                  ? 'assets/images/Logo Blanco.png'
+                  : 'assets/images/Logo verde.png',
               width: 36,
               height: 36,
               fit: BoxFit.contain,
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -425,17 +488,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F3A22),
+                    color: isDark ? Colors.white : const Color(0xFF0F3A22),
                     letterSpacing: -0.3,
                   ),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 1),
                 Text(
                   "PNR Páramo del Duende",
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF2E4F3E),
+                    color: isDark ? const Color(0xFFA3B899) : const Color(0xFF2E4F3E),
                   ),
                 ),
               ],
@@ -462,15 +525,22 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     String catNombre,
     String estadoNombre,
     String titulo,
+    bool isDark,
   ) {
     final catColor = _getCategoryColor(catNombre);
-    final statusColor = _getStatusColor(estadoNombre);
-    final statusBgColor = _getStatusBgColor(estadoNombre);
+    final statusColor = _getStatusColor(estadoNombre, isDark: isDark);
+    final statusBgColor = _getStatusBgColor(estadoNombre, isDark: isDark);
+    final statusBorderColor = _getStatusBorderColor(estadoNombre, isDark: isDark);
 
     final sector = r['sector'] ?? r['ubicacionTexto'] ?? 'Sector Laguna Verde';
     final municipio = r['municipio'] ?? 'PNR Páramo del Duende (Valle del Cauca)';
     final fecha = _formatDate(r['fechaReporte'] ?? r['fechaCreacion']);
-    final autor = r['autorNombre'] ?? r['usuario']?['nombreCompleto'] ?? 'Guardabosques Duende';
+    final autor = r['autorNombre'] ??
+        r['usuarioNombre'] ??
+        r['usuario']?['nombreCompleto'] ??
+        r['usuario']?['nombre'] ??
+        r['nombreUsuario'] ??
+        'Usuario';
     final prioridad = r['prioridadNombre'] ?? r['prioridad']?['nombre'] ?? 'Media';
 
     final lat = (r['latitud'] as num?)?.toDouble() ?? 3.9123;
@@ -540,7 +610,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 decoration: BoxDecoration(
                   color: statusBgColor,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: statusColor.withAlpha(120), width: 1),
+                  border: Border.all(color: statusBorderColor, width: 1.2),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -565,10 +635,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           // Título del reporte
           Text(
             titulo,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 21,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF111827),
+              color: isDark ? Colors.white : const Color(0xFF111827),
               height: 1.25,
             ),
           ),
@@ -577,21 +647,23 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           // Descripción detallada
           Text(
             desc,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF4B5563),
+              color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
               height: 1.5,
             ),
           ),
           const SizedBox(height: 20),
 
-          // Tarjeta blanca con borde suave con datos clave
+          // Tarjeta con borde suave con datos clave
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(
+                color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+              ),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x0A000000),
@@ -603,35 +675,39 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.info_outline, color: Color(0xFF1E5E3A), size: 18),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info_outline, color: Color(0xFF1E5E3A), size: 18),
+                    const SizedBox(width: 8),
                     Text(
                       "Datos Clave del Registro",
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F3A22),
+                        color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF0F3A22),
                       ),
                     ),
                   ],
                 ),
-                const Divider(height: 20),
-                _buildDataRow(Icons.place_outlined, "Sector", sector),
+                Divider(
+                  height: 20,
+                  color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+                ),
+                _buildDataRow(Icons.place_outlined, "Sector", sector, isDark: isDark),
                 const SizedBox(height: 10),
-                _buildDataRow(Icons.location_city_outlined, "Municipio", municipio),
+                _buildDataRow(Icons.location_city_outlined, "Municipio", municipio, isDark: isDark),
                 const SizedBox(height: 10),
-                _buildDataRow(Icons.calendar_today_outlined, "Fecha y hora", fecha),
+                _buildDataRow(Icons.calendar_today_outlined, "Fecha y hora", fecha, isDark: isDark),
                 const SizedBox(height: 10),
-                _buildDataRow(Icons.person_outline, "Autor", autor),
+                _buildDataRow(Icons.person_outline, "Autor", autor, isDark: isDark),
                 const SizedBox(height: 10),
-                _buildDataRow(Icons.gps_fixed, "Coordenadas WGS84", coords),
+                _buildDataRow(Icons.gps_fixed, "Coordenadas WGS84", coords, isDark: isDark),
                 const SizedBox(height: 10),
                 _buildDataRow(
                   Icons.priority_high,
                   "Prioridad",
                   prioridad,
+                  isDark: isDark,
                   badgeColor: prioridad.toLowerCase() == 'alta'
                       ? const Color(0xFFEF4444)
                       : prioridad.toLowerCase() == 'media'
@@ -648,9 +724,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+                ),
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x0A000000),
@@ -668,15 +746,18 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       const SizedBox(width: 8),
                       Text(
                         "Información Específica ($catNombre)",
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F3A22),
+                          color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF0F3A22),
                         ),
                       ),
                     ],
                   ),
-                  const Divider(height: 20),
+                  Divider(
+                    height: 20,
+                    color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+                  ),
                   ..._extractSpecificData(r['datosEspecificos'] ?? r['specificData']).entries.map((entry) {
                     final val = entry.value is List
                         ? (entry.value as List).join(', ')
@@ -687,6 +768,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         Icons.check_circle_outline,
                         _capitalize(entry.key),
                         val.isNotEmpty ? val : 'No especificado',
+                        isDark: isDark,
                       ),
                     );
                   }),
@@ -722,20 +804,24 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     String label,
     String value, {
     Color? badgeColor,
+    bool isDark = false,
   }) {
+    final textMuted = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1F2937);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF6B7280)),
+        Icon(icon, size: 18, color: textMuted),
         const SizedBox(width: 10),
         SizedBox(
           width: 110,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF6B7280),
+              color: textMuted,
             ),
           ),
         ),
@@ -762,10 +848,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 )
               : Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+                    color: textPrimary,
                   ),
                 ),
         ),
@@ -777,7 +863,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   // PESTAÑA 2: EVIDENCIAS (SIN imagen destacada superior)
   // ===========================================================================
 
-  Widget _buildTabEvidencias() {
+  Widget _buildTabEvidencias(bool isDark) {
     if (_imagesList.isEmpty) {
       return Center(
         child: Padding(
@@ -785,21 +871,24 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.photo_library_outlined, size: 54, color: Colors.grey.shade400),
+              Icon(Icons.photo_library_outlined, size: 54, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 "Sin evidencias fotográficas",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF374151),
+                  color: isDark ? Colors.white : const Color(0xFF374151),
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 "Este reporte no contiene fotografías adjuntas.",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                ),
               ),
             ],
           ),
@@ -815,20 +904,20 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 "Galería de Evidencias",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F3A22),
+                  color: isDark ? Colors.white : const Color(0xFF0F3A22),
                 ),
               ),
               Text(
                 "${_imagesList.length} archivo(s)",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF6B7280),
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                 ),
               ),
             ],
@@ -853,9 +942,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+                    ),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x0A000000),
@@ -881,10 +972,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                 item['titulo'] ?? 'Evidencia ${idx + 1}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12.5,
-                                  color: Color(0xFF111827),
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -892,9 +983,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                 item['subtitulo'] ?? 'Vista en campo',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: Color(0xFF6B7280),
+                                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                 ),
                               ),
                             ],
@@ -917,55 +1008,75 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   // PESTAÑA 3: SEGUIMIENTO (SIN imagen destacada superior)
   // ===========================================================================
 
-  Widget _buildTabSeguimiento(Map<String, dynamic> r, String estadoNombre) {
+  Widget _buildTabSeguimiento(Map<String, dynamic> r, String estadoNombre, bool isDark) {
     final status = estadoNombre.toLowerCase();
-    final isEnviado = true;
-    final isEnRevision = status.contains('revis') || status.contains('valid') || status.contains('seguim');
-    final isValidado = status.contains('valid') || status.contains('seguim');
-    final isEnSeguimiento = status.contains('seguim');
+    final isResuelto = status.contains('resuel');
+    final isConvertido = status.contains('convert') || status.contains('proyecto');
+    final isDescartado = status.contains('descart') || status.contains('rechaz');
 
     final fecha = _formatDate(r['fechaReporte'] ?? r['fechaCreacion']);
+    final fechaResolucion = _formatDate(
+      r['fechaResolucion'] ?? r['updatedAt'] ?? r['fechaActualizacion'],
+    );
+    final motivoDescarte = r['motivoDescarte']?.toString().isNotEmpty == true
+        ? r['motivoDescarte'].toString()
+        : r['observaciones']?.toString().isNotEmpty == true
+            ? r['observaciones'].toString()
+            : 'Sin motivo registrado';
+    final proyectoNombre = r['proyectoNombre'] ??
+        r['proyecto']?['nombre'] ??
+        r['codigoProyecto'] ??
+        'Proyecto de conservación';
+
+    // Colores adaptativos al tema
+    final cardBg = isDark ? const Color(0xFF1A2E1A) : const Color(0xFFF0FDF4);
+    final cardBorder = isDark ? const Color(0xFF2D4A2D) : const Color(0xFFBBF7D0);
+    final supervisorLabel = isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534);
+    final sectionTitleColor = isDark ? Colors.white : const Color(0xFF0F3A22);
+    final obsBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final obsBorder = isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB);
+    final obsTextColor = isDark ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 95),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Entidad Supervisora con icono de escudo
+          // Entidad Supervisora con ícono de escudo
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
+              color: cardBg,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
+              border: Border.all(color: cardBorder),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   backgroundColor: Color(0xFF1E5E3A),
                   radius: 20,
                   child: Icon(Icons.shield_outlined, color: Colors.white, size: 22),
                 ),
-                SizedBox(width: 14),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Entidad Supervisora",
+                        'Entidad Supervisora',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF166534),
+                          color: supervisorLabel,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        "Parques Nacionales Naturales de Colombia",
+                        'Parques Nacionales Naturales de Colombia',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F3A22),
+                          color: sectionTitleColor,
                         ),
                       ),
                     ],
@@ -976,86 +1087,225 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           ),
           const SizedBox(height: 22),
 
-          const Text(
-            "Línea de Tiempo del Reporte",
+          Text(
+            'Línea de Tiempo del Reporte',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0F3A22),
+              color: sectionTitleColor,
             ),
           ),
           const SizedBox(height: 16),
 
-          // Nodos numerados y conectados
-          _buildTimelineNode(
-            stepNumber: 1,
-            title: "Reporte Enviado",
-            date: fecha,
-            description: "Registrado por el guardabosques con coordenadas GPS y fotografía.",
-            isCompleted: isEnviado,
-            isCurrent: !isEnRevision,
-            isLast: false,
-          ),
-          _buildTimelineNode(
-            stepNumber: 2,
-            title: "En Revisión Técnica",
-            date: isEnRevision ? "En proceso por el comité biológico" : "Pendiente de asignación",
-            description: "Validación taxonómica, estado fenológico y pertinencia ecológica.",
-            isCompleted: isEnRevision,
-            isCurrent: isEnRevision && !isValidado,
-            isLast: false,
-          ),
-          _buildTimelineNode(
-            stepNumber: 3,
-            title: "Validado Oficialmente",
-            date: isValidado ? "Aprobado por biólogo líder" : "Pendiente de validación",
-            description: "Registro incorporado al inventario biológico del PNR Páramo del Duende.",
-            isCompleted: isValidado,
-            isCurrent: isValidado && !isEnSeguimiento,
-            isLast: false,
-          ),
-          _buildTimelineNode(
-            stepNumber: 4,
-            title: "En Monitoreo Continuo",
-            date: isEnSeguimiento ? "Monitoreo activo" : "Programado para próxima temporada",
-            description: "Seguimiento periódico de la población y condiciones del hábitat.",
-            isCompleted: isEnSeguimiento,
-            isCurrent: isEnSeguimiento,
-            isLast: true,
-          ),
+          // Renderizado dinámico según el ciclo de vida real:
+          if (isResuelto) ...[
+            // CASO RESUELTO: todos los pasos completados con chulito verde
+            _buildTimelineNode(
+              stepNumber: 1,
+              title: 'Reporte Enviado',
+              date: fecha,
+              description: 'Registrado por el guardabosques con coordenadas GPS y fotografía.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 2,
+              title: 'En Revisión Técnica',
+              date: 'Validado por el comité biológico',
+              description: 'Validación taxonómica, estado fenológico y pertinencia ecológica.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 3,
+              title: 'Validado Oficialmente',
+              date: 'Aprobado por biólogo líder',
+              description: 'Registro incorporado al inventario biológico del PNR Páramo del Duende.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 4,
+              title: 'Reporte Resuelto / Intervención Completada',
+              date: fechaResolucion,
+              description: 'El reporte fue atendido y la situación resuelta por el equipo técnico.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: true,
+              isDark: isDark,
+              tagText: 'Completado',
+              tagBgColor: isDark ? const Color(0x3322C55E) : const Color(0xFFDCFCE7),
+              tagTextColor: isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D),
+            ),
+          ] else if (isConvertido) ...[
+            // CASO CONVERTIDO EN PROYECTO
+            _buildTimelineNode(
+              stepNumber: 1,
+              title: 'Reporte Enviado',
+              date: fecha,
+              description: 'Registrado por el guardabosques con coordenadas GPS y fotografía.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 2,
+              title: 'En Revisión Técnica',
+              date: 'Evaluación técnica completada',
+              description: 'El equipo técnico determinó viabilidad de intervención ambiental.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 3,
+              title: 'Convertido en Proyecto: $proyectoNombre',
+              date: 'Vinculado al sistema de proyectos',
+              description: 'Este reporte generó un proyecto de intervención en el PNR Páramo del Duende.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: true,
+              isDark: isDark,
+              customCircleColor: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
+              tagText: 'Proyecto',
+              tagBgColor: isDark ? const Color(0x334F46E5) : const Color(0xFFEEF2FF),
+              tagTextColor: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
+            ),
+          ] else if (isDescartado) ...[
+            // CASO DESCARTADO
+            _buildTimelineNode(
+              stepNumber: 1,
+              title: 'Reporte Enviado',
+              date: fecha,
+              description: 'Registrado por el guardabosques con coordenadas GPS y fotografía.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 2,
+              title: 'En Revisión Técnica',
+              date: fechaResolucion,
+              description: 'Revisión y verificación en campo o por imagen.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 3,
+              title: 'Descartado',
+              date: fechaResolucion,
+              description: 'Motivo: $motivoDescarte',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: true,
+              isDark: isDark,
+              customCircleColor: isDark ? const Color(0xFFEF4444) : const Color(0xFFDC2626),
+              customIcon: const Icon(Icons.close, size: 13, color: Colors.white),
+              tagText: 'Descartado',
+              tagBgColor: isDark ? const Color(0x33EF4444) : const Color(0xFFFEE2E2),
+              tagTextColor: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+            ),
+          ] else ...[
+            // CASO PENDIENTE / EN REVISIÓN (por defecto)
+            _buildTimelineNode(
+              stepNumber: 1,
+              title: 'Reporte Enviado',
+              date: fecha,
+              description: 'Registrado por el guardabosques con coordenadas GPS y fotografía.',
+              isCompleted: true,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Completado',
+            ),
+            _buildTimelineNode(
+              stepNumber: 2,
+              title: 'En Revisión Técnica',
+              date: 'En proceso por el comité biológico',
+              description: 'Validación taxonómica, estado fenológico y pertinencia ecológica.',
+              isCompleted: false,
+              isCurrent: true,
+              isLast: false,
+              isDark: isDark,
+              tagText: 'Actual',
+              customCircleColor: const Color(0xFF2563EB),
+            ),
+            _buildTimelineNode(
+              stepNumber: 3,
+              title: 'Validado Oficialmente',
+              date: 'Pendiente de validación',
+              description: 'Registro a incorporar al inventario biológico del PNR Páramo del Duende.',
+              isCompleted: false,
+              isCurrent: false,
+              isLast: false,
+              isDark: isDark,
+            ),
+            _buildTimelineNode(
+              stepNumber: 4,
+              title: 'Resolución / Monitoreo Continuo',
+              date: 'Programado para próxima temporada',
+              description: 'Seguimiento periódico de la población y condiciones del hábitat.',
+              isCompleted: false,
+              isCurrent: false,
+              isLast: true,
+              isDark: isDark,
+            ),
+          ],
           const SizedBox(height: 20),
 
           // Observaciones del Equipo Técnico
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: obsBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: obsBorder),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.notes, color: Color(0xFF1E5E3A), size: 18),
-                    SizedBox(width: 8),
+                    const Icon(Icons.notes, color: Color(0xFF1E5E3A), size: 18),
+                    const SizedBox(width: 8),
                     Text(
-                      "Observaciones del Equipo Técnico",
+                      'Observaciones del Equipo Técnico',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
-                        color: Color(0xFF111827),
+                        color: sectionTitleColor,
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Text(
-                  "Se recomienda mantener el monitoreo visual trimestral y verificar el gradiente de humedad circundante. La especie presenta características óptimas acordes al gradiente altitudinal.",
+                  r['observacionesTecnicas']?.toString().isNotEmpty == true
+                      ? r['observacionesTecnicas'].toString()
+                      : (isDescartado
+                          ? 'Motivo del descarte: $motivoDescarte'
+                          : 'Se recomienda mantener el monitoreo visual trimestral y verificar el gradiente de humedad circundante. La especie presenta características óptimas acordes al gradiente altitudinal.'),
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF4B5563),
+                    color: obsTextColor,
                     height: 1.4,
                   ),
                 ),
@@ -1076,9 +1326,19 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     required bool isCompleted,
     required bool isCurrent,
     required bool isLast,
+    bool isDark = false,
+    String? tagText,
+    Color? tagBgColor,
+    Color? tagTextColor,
+    Color? customCircleColor,
+    Widget? customIcon,
   }) {
-    final activeColor = const Color(0xFF1E5E3A);
-    final inactiveColor = const Color(0xFFD1D5DB);
+    final activeColor = customCircleColor ?? const Color(0xFF1E5E3A);
+    final inactiveColor = isDark ? const Color(0xFF4B5563) : const Color(0xFFD1D5DB);
+    final isDone = isCompleted;
+
+    final defaultTagBg = isDark ? const Color(0x3322C55E) : const Color(0xFFDCFCE7);
+    final defaultTagText = isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,29 +1350,31 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isCompleted ? activeColor : Colors.white,
+                color: isDone || isCurrent ? activeColor : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
                 border: Border.all(
-                  color: isCompleted ? activeColor : inactiveColor,
+                  color: isDone || isCurrent ? activeColor : inactiveColor,
                   width: 2,
                 ),
               ),
               alignment: Alignment.center,
-              child: isCompleted
-                  ? const Icon(Icons.check, size: 13, color: Colors.white)
-                  : Text(
-                      stepNumber.toString(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: inactiveColor,
-                      ),
-                    ),
+              child: isDone
+                  ? (customIcon ?? const Icon(Icons.check, size: 13, color: Colors.white))
+                  : (isCurrent
+                      ? const Icon(Icons.access_time_rounded, size: 13, color: Colors.white)
+                      : Text(
+                          stepNumber.toString(),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: inactiveColor,
+                          ),
+                        )),
             ),
             if (!isLast)
               Container(
                 width: 2.5,
                 height: 52,
-                color: isCompleted ? activeColor : inactiveColor,
+                color: isDone ? activeColor : inactiveColor,
               ),
           ],
         ),
@@ -1126,27 +1388,31 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: isCompleted ? const Color(0xFF111827) : const Color(0xFF6B7280),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? (isDone || isCurrent ? Colors.white : const Color(0xFF9CA3AF))
+                              : (isDone || isCurrent ? const Color(0xFF111827) : const Color(0xFF6B7280)),
+                        ),
                       ),
                     ),
-                    if (isCurrent)
+                    if (tagText != null || isCurrent)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
+                          color: tagBgColor ?? (isCurrent ? (isDark ? const Color(0x332563EB) : const Color(0xFFDBEAFE)) : defaultTagBg),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Text(
-                          "Actual",
+                        child: Text(
+                          tagText ?? "Actual",
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF15803D),
+                            color: tagTextColor ?? (isCurrent ? const Color(0xFF2563EB) : defaultTagText),
                           ),
                         ),
                       ),
@@ -1155,18 +1421,18 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 const SizedBox(height: 2),
                 Text(
                   date,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
-                    color: Color(0xFF6B7280),
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
-                    color: Color(0xFF4B5563),
+                    color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
                   ),
                 ),
               ],
@@ -1181,16 +1447,20 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   // BOTÓN INFERIOR FIJO: "VER EN EL MAPA"
   // ===========================================================================
 
-  Widget _buildBottomBar(Map<String, dynamic> r) {
+  Widget _buildBottomBar(Map<String, dynamic> r, bool isDark) {
     return SafeArea(
       top: false,
       bottom: true,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-          boxShadow: [
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+            ),
+          ),
+          boxShadow: const [
             BoxShadow(
               color: Color(0x10000000),
               blurRadius: 10,
@@ -1203,10 +1473,16 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           height: 48,
           child: ElevatedButton.icon(
             onPressed: () {
-              Navigator.pop(context, {
-                'action': 'center_on_map',
-                'reporte': r,
-              });
+              final lat = (r['latitud'] as num?)?.toDouble() ?? 4.1151;
+              final lng = (r['longitud'] as num?)?.toDouble() ?? -76.1976;
+              final reporteId = r['id']?.toString();
+              MapFocusService.instance.requestFocus(
+                lat: lat,
+                lng: lng,
+                zoom: 16.0,
+                reporteId: reporteId,
+              );
+              Navigator.popUntil(context, (route) => route.isFirst);
             },
             icon: const Icon(Icons.map_rounded, color: Colors.white, size: 20),
             label: const Text(

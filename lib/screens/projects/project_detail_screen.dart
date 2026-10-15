@@ -10,6 +10,7 @@ import 'package:goblink_park/screens/profile/notification_service.dart';
 import 'package:goblink_park/screens/api_connection/api_config.dart';
 import 'package:goblink_park/screens/projects/activity_evidence_screen.dart';
 import 'package:goblink_park/screens/projects/project_image_helper.dart';
+import 'package:goblink_park/screens/reports/report_detail_screen.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   final int projectId;
@@ -38,6 +39,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   List<dynamic> _presupuesto = [];
   List<dynamic> _actividades = [];
   List<dynamic> _observaciones = [];
+  List<Map<String, dynamic>> _reportesVinculados = [];
 
   bool _isDownloadingPdf = false;
 
@@ -48,7 +50,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     if (widget.initialProject != null) {
       _projectData = Map<String, dynamic>.from(widget.initialProject!);
     }
@@ -261,6 +263,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         // Enriquecer fotos de perfil de miembros si el DTO de miembro no incluye fotoPerfilUrl / fotoPerfil
         await _enrichMembersProfilePhotos(token: token, currentUserId: userId);
       }
+
+      // Cargar y enriquecer los reportes vinculados al proyecto
+      await _loadReportesVinculados(token: token);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -732,6 +737,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final nombre = _projectData['nombre']?.toString() ?? 'Proyecto ambiental';
     final categoria = _projectData['categoriaNombre']?.toString() ??
         _projectData['categoria']?.toString() ??
@@ -743,12 +749,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final bannerUrl = _getImageUrl();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       bottomNavigationBar: !_isMember
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x10000000),
@@ -757,7 +763,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   ),
                 ],
                 border: Border(
-                  top: BorderSide(color: Colors.grey.shade200),
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF374151) : Colors.grey.shade200,
+                  ),
                 ),
               ),
               child: SafeArea(
@@ -1003,14 +1011,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   isScrollable: false,
                   indicatorColor: const Color(0xFF1E5E3A),
                   indicatorWeight: 3,
-                  labelColor: const Color(0xFF1E5E3A),
+                  labelColor: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
                   unselectedLabelColor: const Color(0xFF6B7280),
                   labelStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.bold,
                   ),
                   unselectedLabelStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
                   onTap: (_) => setState(() {}),
@@ -1018,6 +1026,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                     Tab(text: 'Resumen'),
                     Tab(text: 'Actividades'),
                     Tab(text: 'Miembros'),
+                    Tab(text: 'Reportes'),
                   ],
                 ),
               ),
@@ -1071,6 +1080,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                       _buildTabResumen(),
                       _buildTabActividades(),
                       _buildTabMiembros(),
+                      _buildTabReportes(),
                     ],
                   ),
       ),
@@ -2182,6 +2192,489 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       },
     );
   }
+
+  // ===========================================================================
+  // 4. PESTAÑA: REPORTES AMBIENTALES ASOCIADOS AL PROYECTO
+  // ===========================================================================
+
+  Future<void> _loadReportesVinculados({String? token}) async {
+    final List<Map<String, dynamic>> resolved = [];
+    final Set<int> seenIds = {};
+
+    // 1. Añadir candidatos ya obtenidos en _observaciones
+    final List<dynamic> rawList = List.from(_observaciones);
+
+    // 2. Si el proyecto tiene reporteOriginalId o reporteOriginal directo
+    final directId = _projectData['reporteOriginalId'] ??
+        _projectData['idReporteOriginal'] ??
+        _projectData['reporteId'] ??
+        _projectData['idReporte'];
+    if (directId != null) {
+      final parsed = int.tryParse(directId.toString());
+      if (parsed != null && parsed > 0) {
+        rawList.add({'id': parsed, 'reporteId': parsed});
+      }
+    }
+    if (_projectData['reporteOriginal'] is Map) {
+      rawList.add(_projectData['reporteOriginal']);
+    }
+
+    // 3. Si no hay candidatos, consultar GET /api/proyecto-reportes/proyecto/${widget.projectId}
+    if (rawList.isEmpty) {
+      try {
+        final authToken = token ?? await AuthService.getToken();
+        final vincRes = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/api/proyecto-reportes/proyecto/${widget.projectId}'),
+          headers: {
+            'Content-Type': 'application/json',
+            if (authToken != null && authToken.isNotEmpty) 'Authorization': 'Bearer $authToken',
+          },
+        ).timeout(const Duration(seconds: 15));
+        if (vincRes.statusCode == 200) {
+          final vincBody = jsonDecode(vincRes.body);
+          if (vincBody is List) {
+            rawList.addAll(vincBody);
+          } else if (vincBody is Map && vincBody['content'] is List) {
+            rawList.addAll(vincBody['content'] as List);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4. Procesar y enriquecer cada reporte
+    final authToken = token ?? await AuthService.getToken();
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      if (authToken != null && authToken.isNotEmpty) 'Authorization': 'Bearer $authToken',
+    };
+
+    for (final item in rawList) {
+      if (item is! Map) continue;
+      Map<String, dynamic> repMap = item['reporte'] is Map
+          ? Map<String, dynamic>.from(item['reporte'] as Map)
+          : Map<String, dynamic>.from(item);
+
+      final repId = int.tryParse((repMap['id'] ?? repMap['reporteId'] ?? repMap['idReporte'])?.toString() ?? '');
+      if (repId != null && repId > 0) {
+        if (seenIds.contains(repId)) continue;
+        seenIds.add(repId);
+
+        final bool hasEssentialData = repMap['titulo'] != null &&
+            (repMap['categoriaNombre'] != null || repMap['categoria'] != null) &&
+            (repMap['fotoPrincipalUrl'] != null || repMap['evidencias'] != null);
+
+        if (!hasEssentialData && authToken != null) {
+          try {
+            final repRes = await http.get(
+              Uri.parse('${ApiConfig.baseUrl}/api/reportes/$repId'),
+              headers: headers,
+            ).timeout(const Duration(seconds: 12));
+            if (repRes.statusCode == 200) {
+              final decoded = jsonDecode(repRes.body);
+              if (decoded is Map<String, dynamic>) {
+                repMap = decoded;
+              }
+            }
+          } catch (_) {}
+        }
+        resolved.add(repMap);
+      } else if (repMap['titulo'] != null || repMap['descripcion'] != null) {
+        resolved.add(repMap);
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _reportesVinculados = resolved;
+    });
+  }
+
+  Widget _buildTabReportes() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    if (_reportesVinculados.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.assignment_outlined,
+                size: 64,
+                color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'No hay reportes vinculados a este proyecto',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Este proyecto no cuenta con observaciones ambientales o reportes asociados por el momento.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+      itemCount: _reportesVinculados.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final rep = _reportesVinculados[index];
+        return _buildReportItemCard(rep, isDark);
+      },
+    );
+  }
+
+  Widget _buildReportItemCard(Map<String, dynamic> rep, bool isDark) {
+    final catNombre = rep['categoriaNombre']?.toString() ??
+        rep['categoria']?['nombre']?.toString() ??
+        rep['categoria']?.toString() ??
+        'Flora';
+    final estadoNombre = rep['estadoReporteNombre']?.toString() ??
+        rep['estado']?['nombre']?.toString() ??
+        rep['estado']?.toString() ??
+        'En atención';
+    final titulo = rep['titulo']?.toString().isNotEmpty == true
+        ? rep['titulo'].toString()
+        : 'Observación en PNR Páramo del Duende';
+    final sector = rep['sector']?.toString().isNotEmpty == true
+        ? rep['sector'].toString()
+        : (rep['ubicacionTexto']?.toString() ?? 'PNR Páramo del Duende');
+    final fechaStr = _formatReportDate(rep['fechaReporte'] ?? rep['fechaCreacion']);
+
+    final catColor = _getReportCategoryColor(catNombre);
+    final catIcon = _getReportCategoryIcon(catNombre);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReportDetailScreen(reporte: rep),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Miniatura de la evidencia fotográfica
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    color: Colors.grey.shade200,
+                    child: _buildReportThumbnail(rep, catNombre),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Información textual del reporte
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Chip de categoría y Badge de estado
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: catColor.withAlpha(isDark ? 50 : 25),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: catColor.withAlpha(isDark ? 140 : 80),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(catIcon, size: 12, color: catColor),
+                                const SizedBox(width: 4),
+                                Text(
+                                  catNombre,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: catColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _buildReportStatusBadge(estadoNombre, isDark),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Título del reporte
+                      Text(
+                        titulo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF111827),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Sector
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.place_outlined,
+                            size: 13,
+                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              sector,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+
+                      // Fecha
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 12,
+                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            fechaStr,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportThumbnail(Map<String, dynamic> rep, String catNombre) {
+    String? photoUrl = (rep['fotoPrincipalUrl'] ??
+            rep['imagenUrl'] ??
+            rep['fotoUrl'] ??
+            rep['urlFoto'] ??
+            rep['foto'])
+        ?.toString()
+        .trim();
+
+    if ((photoUrl == null || photoUrl.isEmpty) &&
+        rep['evidencias'] is List &&
+        (rep['evidencias'] as List).isNotEmpty) {
+      final firstEv = (rep['evidencias'] as List).first;
+      if (firstEv is Map) {
+        photoUrl = (firstEv['urlArchivo'] ?? firstEv['url'] ?? firstEv['archivoBase64'])
+            ?.toString()
+            .trim();
+      }
+    }
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+        return CachedNetworkImage(
+          imageUrl: photoUrl,
+          width: 76,
+          height: 76,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            width: 76,
+            height: 76,
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1E5E3A)),
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) => Image.asset(
+            _getReportCategoryAsset(catNombre),
+            width: 76,
+            height: 76,
+            fit: BoxFit.cover,
+          ),
+        );
+      }
+      if (photoUrl.startsWith('data:image') || !photoUrl.startsWith('http')) {
+        try {
+          String cleanBase64 = photoUrl;
+          if (cleanBase64.contains(',')) {
+            cleanBase64 = cleanBase64.split(',').last;
+          }
+          final bytes = base64Decode(cleanBase64);
+          return Image.memory(
+            bytes,
+            width: 76,
+            height: 76,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Image.asset(
+              _getReportCategoryAsset(catNombre),
+              width: 76,
+              height: 76,
+              fit: BoxFit.cover,
+            ),
+          );
+        } catch (_) {}
+      }
+    }
+
+    return Image.asset(
+      _getReportCategoryAsset(catNombre),
+      width: 76,
+      height: 76,
+      fit: BoxFit.cover,
+    );
+  }
+
+  Widget _buildReportStatusBadge(String estadoNombre, bool isDark) {
+    final s = estadoNombre.toLowerCase();
+    Color statusColor;
+    Color statusBgColor;
+    Color statusBorderColor;
+
+    if (s.contains('resuel')) {
+      statusColor = isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
+      statusBgColor = isDark ? const Color(0x3322C55E) : const Color(0xFFDCFCE7);
+      statusBorderColor = isDark ? const Color(0xFF22C55E) : const Color(0xFF166534);
+    } else if (s.contains('convert') || s.contains('proyecto')) {
+      statusColor = isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5);
+      statusBgColor = isDark ? const Color(0x334F46E5) : const Color(0xFFEEF2FF);
+      statusBorderColor = isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5);
+    } else if (s.contains('descart') || s.contains('rechaz')) {
+      statusColor = isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
+      statusBgColor = isDark ? const Color(0x33EF4444) : const Color(0xFFFEE2E2);
+      statusBorderColor = isDark ? const Color(0xFFEF4444) : const Color(0xFFDC2626);
+    } else {
+      statusColor = isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+      statusBgColor = isDark ? const Color(0x33F59E0B) : const Color(0xFFFEF3C7);
+      statusBorderColor = isDark ? const Color(0xFFF59E0B) : const Color(0xFFD97706);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: statusBgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: statusBorderColor, width: 1),
+      ),
+      child: Text(
+        estadoNombre.isNotEmpty ? estadoNombre : 'En atención',
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.bold,
+          color: statusColor,
+        ),
+      ),
+    );
+  }
+
+  IconData _getReportCategoryIcon(String? cat) {
+    final c = cat?.toLowerCase() ?? '';
+    if (c.contains('fauna') || c.contains('animal')) return Icons.pets;
+    if (c.contains('agua') || c.contains('hídric')) return Icons.water_drop;
+    if (c.contains('suelo') || c.contains('tierra')) return Icons.landscape;
+    if (c.contains('aire') || c.contains('clima')) return Icons.air;
+    return Icons.eco;
+  }
+
+  Color _getReportCategoryColor(String? cat) {
+    final c = cat?.toLowerCase() ?? '';
+    if (c.contains('fauna') || c.contains('animal')) return const Color(0xFF9A6735);
+    if (c.contains('flora') || c.contains('vegetal')) return const Color(0xFF1E5E3A);
+    if (c.contains('suelo') || c.contains('tierra')) return const Color(0xFF8C5E48);
+    if (c.contains('agua') || c.contains('hídric')) return const Color(0xFF2563EB);
+    if (c.contains('aire') || c.contains('clima')) return const Color(0xFF0284C7);
+    return const Color(0xFF1E5E3A);
+  }
+
+  String _getReportCategoryAsset(String? cat) {
+    final c = cat?.toLowerCase() ?? '';
+    if (c.contains('fauna') || c.contains('animal')) return 'assets/images/Fauna.jpg';
+    if (c.contains('agua') || c.contains('hídric')) return 'assets/images/Agua.jpg';
+    if (c.contains('aire') || c.contains('clima')) return 'assets/images/Aire.jpg';
+    if (c.contains('suelo') || c.contains('tierra')) return 'assets/images/Suelo.jpg';
+    return 'assets/images/Flora.jpg';
+  }
+
+  String _formatReportDate(dynamic dt) {
+    if (dt == null) return 'Reciente';
+    try {
+      final date = DateTime.parse(dt.toString());
+      const months = [
+        'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+        'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+      ];
+      final hour = date.hour.toString().padLeft(2, '0');
+      final minute = date.minute.toString().padLeft(2, '0');
+      return '${date.day} ${months[date.month - 1]} ${date.year} · $hour:$minute';
+    } catch (_) {
+      return dt.toString();
+    }
+  }
 }
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
@@ -2199,8 +2692,9 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       child: _tabBar,
     );
   }

@@ -23,6 +23,10 @@ class _ProjectsHomeScreenState extends State<ProjectsHomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedFilter = 'Todos'; // 'Todos', 'Activos', 'Finalizados'
+  String _selectedCategoria = 'Todas'; // 'Todas', 'Flora', 'Fauna', 'Agua', 'Suelo', 'Aire'
+
+  bool get _hasActiveFilters =>
+      _selectedFilter != 'Todos' || _selectedCategoria != 'Todas';
 
   @override
   void initState() {
@@ -107,44 +111,47 @@ class _ProjectsHomeScreenState extends State<ProjectsHomeScreen> {
 
         if (!matchesQuery) return false;
 
+        // 1. Filtrar por Estado
         final estado = (p['estadoProyectoNombre'] ?? p['estado'] ?? '')
             .toString()
             .toLowerCase();
         if (_selectedFilter == 'Activos') {
-          return estado.contains('activo') ||
+          final isActivo = estado.contains('activo') ||
               estado.contains('ejecuci') ||
               estado.contains('planific') ||
               estado.isEmpty;
+          if (!isActivo) return false;
         } else if (_selectedFilter == 'Finalizados') {
-          return estado.contains('finaliz') ||
+          final isFinalizado = estado.contains('finaliz') ||
               estado.contains('terminad') ||
               estado.contains('completa');
+          if (!isFinalizado) return false;
         }
+
+        // 2. Filtrar por Categoría Ecológica
+        if (_selectedCategoria != 'Todas') {
+          final target = _selectedCategoria.toLowerCase();
+          bool matchCat = cat.contains(target);
+          if (!matchCat) {
+            if (target == 'agua' && (cat.contains('hídric') || cat.contains('cauce') || cat.contains('rio'))) {
+              matchCat = true;
+            } else if (target == 'fauna' && (cat.contains('animal') || cat.contains('silvestre'))) {
+              matchCat = true;
+            } else if (target == 'flora' && (cat.contains('vegetal') || cat.contains('bosque') || cat.contains('planta'))) {
+              matchCat = true;
+            } else if (target == 'suelo' && (cat.contains('tierra') || cat.contains('sustrato') || cat.contains('erosi'))) {
+              matchCat = true;
+            } else if (target == 'aire' && (cat.contains('clima') || cat.contains('atmosf'))) {
+              matchCat = true;
+            }
+          }
+          if (!matchCat) return false;
+        }
+
         return true;
       }).toList();
     });
   }
-
-  int get _todosCount => _allProjects.length;
-
-  int get _activosCount => _allProjects.where((p) {
-        final estado = (p['estadoProyectoNombre'] ?? p['estado'] ?? '')
-            .toString()
-            .toLowerCase();
-        return estado.contains('activo') ||
-            estado.contains('ejecuci') ||
-            estado.contains('planific') ||
-            estado.isEmpty;
-      }).length;
-
-  int get _finalizadosCount => _allProjects.where((p) {
-        final estado = (p['estadoProyectoNombre'] ?? p['estado'] ?? '')
-            .toString()
-            .toLowerCase();
-        return estado.contains('finaliz') ||
-            estado.contains('terminad') ||
-            estado.contains('completa');
-      }).length;
 
   double _getProjectProgress(dynamic p) {
     if (p['porcentajeAvance'] != null) {
@@ -207,8 +214,6 @@ class _ProjectsHomeScreenState extends State<ProjectsHomeScreen> {
                       const SizedBox(height: 14),
                       _buildSearchBar(),
                       const SizedBox(height: 12),
-                      _buildFilterChips(),
-                      const SizedBox(height: 8),
                     ],
                   ),
                 ),
@@ -529,105 +534,409 @@ class _ProjectsHomeScreenState extends State<ProjectsHomeScreen> {
     );
   }
 
-  // Buscador de proyectos
+  // Buscador de proyectos con botón de filtros estilizado
   Widget _buildSearchBar() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB),
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB),
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x06000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Buscar proyectos o categorías...',
+                hintStyle: TextStyle(
+                  fontSize: 13.5,
+                  color: isDark ? const Color(0xFF9CA3AF) : Colors.grey.shade400,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+                  size: 22,
+                ),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Buscar proyectos o categorías...',
-          hintStyle: TextStyle(
-            fontSize: 13.5,
-            color: isDark ? const Color(0xFF9CA3AF) : Colors.grey.shade400,
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
-            size: 22,
-          ),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () => _searchController.clear(),
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
+        const SizedBox(width: 10),
+        _buildFilterButton(isDark, theme),
+      ],
     );
   }
 
-  // Chips de filtro
-  Widget _buildFilterChips() {
+  // Botón estilizado de filtros con indicador de badge
+  Widget _buildFilterButton(bool isDark, ThemeData theme) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: _hasActiveFilters
+              ? (isDark ? const Color(0xFF1E5E3A) : const Color(0xFFE8F5E9))
+              : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: _showAdvancedFilterModal,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _hasActiveFilters
+                      ? const Color(0xFF1E5E3A)
+                      : (isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB)),
+                  width: _hasActiveFilters ? 1.5 : 1,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x06000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.tune_rounded,
+                color: _hasActiveFilters
+                    ? (isDark ? Colors.white : const Color(0xFF1E5E3A))
+                    : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563)),
+                size: 22,
+              ),
+            ),
+          ),
+        ),
+        if (_hasActiveFilters)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: theme.scaffoldBackgroundColor,
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ModalBottomSheet de filtros avanzados
+  void _showAdvancedFilterModal() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final filters = [
-      {'key': 'Todos', 'label': 'Todos ($_todosCount)'},
-      {'key': 'Activos', 'label': 'Activos ($_activosCount)'},
-      {'key': 'Finalizados', 'label': 'Finalizados ($_finalizadosCount)'},
-    ];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: filters.map((item) {
-          final key = item['key']!;
-          final label = item['label']!;
-          final isSelected = _selectedFilter == key;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark ? const Color(0xFFE8F5E9) : const Color(0xFF374151)),
+    String tempEstado = _selectedFilter;
+    String tempCategoria = _selectedCategoria;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final bottomPadding = MediaQuery.of(ctx).viewPadding.bottom;
+            final surfaceColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+            final textColor = isDark ? Colors.white : const Color(0xFF111827);
+            final subtitleColor = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
+
+            final estados = [
+              {'key': 'Todos', 'label': 'Todos'},
+              {'key': 'Activos', 'label': 'En Planificación / Activos'},
+              {'key': 'Finalizados', 'label': 'Finalizados'},
+            ];
+
+            final categorias = [
+              {'key': 'Todas', 'label': 'Todas', 'icon': Icons.apps_rounded},
+              {'key': 'Flora', 'label': 'Flora', 'icon': Icons.eco_rounded},
+              {'key': 'Fauna', 'label': 'Fauna', 'icon': Icons.pets_rounded},
+              {'key': 'Agua', 'label': 'Agua', 'icon': Icons.water_drop_rounded},
+              {'key': 'Suelo', 'label': 'Suelo', 'icon': Icons.landscape_rounded},
+              {'key': 'Aire', 'label': 'Aire', 'icon': Icons.air_rounded},
+            ];
+
+            return Container(
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    14,
+                    20,
+                    bottomPadding > 0 ? bottomPadding + 14 : 20,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Tirador superior
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF4B5563) : const Color(0xFFE5E7EB),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Cabecera del modal
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.tune_rounded,
+                                color: isDark ? const Color(0xFF52B788) : const Color(0xFF1E5E3A),
+                                size: 22,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Filtros de Proyectos',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: textColor,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: subtitleColor,
+                              size: 22,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      // 1. Filtrar por Estado
+                      Text(
+                        'Filtrar por Estado',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: estados.map((e) {
+                          final isSelected = tempEstado == e['key'];
+                          return ChoiceChip(
+                            label: Text(
+                              e['label']!,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151)),
+                              ),
+                            ),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF1E5E3A),
+                            backgroundColor: isDark ? const Color(0xFF262626) : const Color(0xFFF3F4F6),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? const Color(0xFF1E5E3A)
+                                  : (isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB)),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            showCheckmark: false,
+                            onSelected: (val) {
+                              setModalState(() {
+                                tempEstado = e['key']!;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 2. Filtrar por Categoría Ecológica
+                      Text(
+                        'Filtrar por Categoría Ecológica',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: categorias.map((c) {
+                          final isSelected = tempCategoria == c['key'];
+                          return ChoiceChip(
+                            avatar: Icon(
+                              c['icon'] as IconData,
+                              size: 16,
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF1E5E3A)),
+                            ),
+                            label: Text(
+                              c['label'] as String,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151)),
+                              ),
+                            ),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF1E5E3A),
+                            backgroundColor: isDark ? const Color(0xFF262626) : const Color(0xFFF3F4F6),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? const Color(0xFF1E5E3A)
+                                  : (isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB)),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            showCheckmark: false,
+                            onSelected: (val) {
+                              setModalState(() {
+                                tempCategoria = c['key'] as String;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 26),
+
+                      // Botones de acción: Limpiar filtros y Aplicar filtros
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  setModalState(() {
+                                    tempEstado = 'Todos';
+                                    tempCategoria = 'Todas';
+                                  });
+                                  setState(() {
+                                    _selectedFilter = 'Todos';
+                                    _selectedCategoria = 'Todas';
+                                  });
+                                  _applyFilters();
+                                  Navigator.pop(ctx);
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: isDark ? const Color(0xFF4B5563) : const Color(0xFFD1D5DB),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Limpiar filtros',
+                                  style: TextStyle(
+                                    color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedFilter = tempEstado;
+                                    _selectedCategoria = tempCategoria;
+                                  });
+                                  _applyFilters();
+                                  Navigator.pop(ctx);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1E5E3A),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Aplicar filtros',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              selected: isSelected,
-              selectedColor: const Color(0xFF1E5E3A),
-              backgroundColor: theme.colorScheme.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected
-                      ? const Color(0xFF1E5E3A)
-                      : (isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB)),
-                ),
-              ),
-              showCheckmark: false,
-              onSelected: (val) {
-                if (val) {
-                  setState(() => _selectedFilter = key);
-                  _applyFilters();
-                }
-              },
-            ),
-          );
-        }).toList(),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 

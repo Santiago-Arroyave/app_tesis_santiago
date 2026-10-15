@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Android 12+ (API 31+): SplashScreen API transparente para evitar pantalla verde intermedia.
+         Flutter SplashScreen (frailejones) se muestra inmediatamente en el primer frame. -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowSplashScreenBackground">#0d2319</item>
+        <item name="android:windowSplashScreenBackground">@android:color/white</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/logo_goblinpark</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#0d2319</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/white</item>
     </style>
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>

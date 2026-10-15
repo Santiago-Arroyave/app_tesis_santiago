@@ -11,6 +11,7 @@ import 'package:goblink_park/screens/api_connection/api_config.dart';
 import 'package:goblink_park/screens/login_screen/auth_service.dart';
 import 'package:goblink_park/screens/main_map/map_filter_sheet.dart';
 import 'package:goblink_park/screens/reports/report_detail_screen.dart';
+import 'package:goblink_park/providers/map_focus_service.dart';
 import 'package:goblink_park/widgets/notification_bell_button.dart';
 
 enum MapLayerType { satellite, topographic, standard }
@@ -53,10 +54,31 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     });
     _getCurrentLocation();
     _startLocationTracking();
+    // Escuchar peticiones de centrado externo (ej. "Ver en el mapa" desde detalle)
+    MapFocusService.instance.pendingFocus.addListener(_onMapFocusRequested);
+  }
+
+  void _onMapFocusRequested() {
+    final req = MapFocusService.instance.pendingFocus.value;
+    if (req == null || !mounted) return;
+    MapFocusService.instance.consume();
+    // Anima la cámara a las coordenadas solicitadas
+    _mapController.move(LatLng(req.latitude, req.longitude), req.zoom);
+    // Si hay un reporte asociado, abrirlo en el selector del mapa
+    if (req.reporteId != null) {
+      final rep = _reportes.firstWhere(
+        (r) => r['id']?.toString() == req.reporteId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (rep.isNotEmpty && mounted) {
+        setState(() => _selectedReporte = Map<String, dynamic>.from(rep));
+      }
+    }
   }
 
   @override
   void dispose() {
+    MapFocusService.instance.pendingFocus.removeListener(_onMapFocusRequested);
     _positionSubscription?.cancel();
     _searchController.dispose();
     super.dispose();

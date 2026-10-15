@@ -35,20 +35,9 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
   final MapController _mapController = MapController();
   bool _gettingGPS = false;
 
-  String _selectedSector = 'Laguna Verde';
+  final TextEditingController _sectorController = TextEditingController();
   final TextEditingController _municipioController =
       TextEditingController(text: 'Tuluá, Valle del Cauca');
-
-  final List<String> _sectores = [
-    'Laguna Verde',
-    'Sector El Duende',
-    'Alto de la Cruz',
-    'Quebrada Honda',
-    'Sector El Púlpito',
-    'Sector Las Hermosas',
-    'Sector Mirador',
-    'Otro sector',
-  ];
 
   @override
   void initState() {
@@ -59,6 +48,7 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
 
   @override
   void dispose() {
+    _sectorController.dispose();
     _municipioController.dispose();
     super.dispose();
   }
@@ -109,6 +99,13 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
   }
 
   Future<void> _onConfirmLocation() async {
+    if (_sectorController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor ingresa el sector')),
+      );
+      return;
+    }
+
     if (_municipioController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor ingresa el municipio')),
@@ -128,7 +125,7 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
           photos: widget.photos,
           specificData: widget.specificData,
           location: _selectedLocation,
-          sector: _selectedSector,
+          sector: _sectorController.text.trim(),
           municipio: _municipioController.text.trim(),
         ),
       ),
@@ -153,15 +150,19 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Color(0xFF0F3A22)),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: isDark ? Colors.white : const Color(0xFF0F3A22),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "Ubicación geográfica",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F3A22),
+            color: isDark ? Colors.white : const Color(0xFF0F3A22),
           ),
         ),
         centerTitle: true,
@@ -175,7 +176,7 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStepIndicator(3, "Ubicación geográfica"),
+                    _buildStepIndicator(3, "Ubicación geográfica", isDark: isDark),
                     const SizedBox(height: 12),
                     Text(
                       "Punto de observación",
@@ -222,7 +223,7 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
     );
   }
 
-  Widget _buildStepIndicator(int currentStep, String stepTitle) {
+  Widget _buildStepIndicator(int currentStep, String stepTitle, {bool isDark = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -231,7 +232,9 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
             final stepNum = index + 1;
             final isDone = stepNum < currentStep;
             final isCurrent = stepNum == currentStep;
-            final color = isDone || isCurrent ? const Color(0xFF1E5E3A) : const Color(0xFFD1D5DB);
+            final color = isDone || isCurrent
+                ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A))
+                : (isDark ? const Color(0xFF374151) : const Color(0xFFD1D5DB));
 
             return Expanded(
               child: Container(
@@ -248,10 +251,10 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
         const SizedBox(height: 8),
         Text(
           "Paso $currentStep de 4 • $stepTitle",
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E5E3A),
+            color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1E5E3A),
           ),
         ),
       ],
@@ -419,13 +422,16 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Sector del Páramo *",
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+        Text(
+          "Sector *",
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF374151),
+          ),
         ),
         const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(14),
@@ -433,26 +439,29 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
               color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
             ),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedSector,
-              isExpanded: true,
-              items: _sectores.map((s) {
-                return DropdownMenuItem<String>(
-                  value: s,
-                  child: Text(
-                    s,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: isDark ? Colors.white : const Color(0xFF1F2937),
-                    ),
-                  ),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedSector = val);
-              },
+          child: TextFormField(
+            controller: _sectorController,
+            textCapitalization: TextCapitalization.sentences,
+            style: TextStyle(
+              fontSize: 13.5,
+              color: isDark ? Colors.white : const Color(0xFF1F2937),
             ),
+            decoration: InputDecoration(
+              hintText: 'Escribe el sector... (ej. Laguna Verde, Cuenca Alta)',
+              hintStyle: TextStyle(
+                fontSize: 13,
+                color: isDark ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
+              ),
+              prefixIcon: const Icon(
+                Icons.location_on_outlined,
+                color: Color(0xFF1E5E3A),
+                size: 20,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            ),
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'El sector es obligatorio' : null,
           ),
         ),
       ],
@@ -463,9 +472,13 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "Municipio / Jurisdicción *",
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF374151),
+          ),
         ),
         const SizedBox(height: 6),
         Container(

@@ -149,15 +149,19 @@ class NotificationsScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Color(0xFF0F3A22)),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: isDark ? Colors.white : const Color(0xFF0F3A22),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "Notificaciones",
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F3A22),
+            color: isDark ? Colors.white : const Color(0xFF0F3A22),
           ),
         ),
         centerTitle: true,
@@ -168,12 +172,20 @@ class NotificationsScreen extends StatelessWidget {
                 children: [
                   if (notifProvider.unreadCount > 0)
                     IconButton(
-                      icon: const Icon(Icons.done_all_rounded, color: Color(0xFF1E5E3A), size: 22),
+                      icon: Icon(
+                        Icons.done_all_rounded,
+                        color: isDark ? Colors.white70 : const Color(0xFF1E5E3A),
+                        size: 22,
+                      ),
                       tooltip: 'Marcar todas como leídas',
                       onPressed: () => notifProvider.markAllAsRead(),
                     ),
                   IconButton(
-                    icon: const Icon(Icons.refresh, color: Color(0xFF0F3A22), size: 22),
+                    icon: Icon(
+                      Icons.refresh,
+                      color: isDark ? Colors.white : const Color(0xFF0F3A22),
+                      size: 22,
+                    ),
                     tooltip: 'Actualizar',
                     onPressed: () => notifProvider.loadNotifications(),
                   ),

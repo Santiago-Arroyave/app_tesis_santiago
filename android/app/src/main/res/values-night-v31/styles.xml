@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowSplashScreenBackground">#0d2319</item>
+    <!-- Android 12+ Dark Mode: mismo tratamiento transparente para no bloquear el SplashScreen de Flutter. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@android:color/white</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/logo_goblinpark</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#0d2319</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/white</item>
     </style>
-    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
 </resources>

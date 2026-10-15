@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo nativo para API ≤ 30: blanco liso para que Flutter tome el control
+     en el primer frame sin mostrar la pantalla verde oscura. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/splash_background" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/logo_goblinpark" />
-    </item>
+    <item android:drawable="@android:color/white" />
 </layer-list>

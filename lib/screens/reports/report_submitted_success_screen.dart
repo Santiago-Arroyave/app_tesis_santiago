@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:goblink_park/providers/map_focus_service.dart';
 
 class ReportSubmittedSuccessScreen extends StatelessWidget {
   final Map<String, dynamic> reporteData;
@@ -306,7 +307,15 @@ class ReportSubmittedSuccessScreen extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // Regresar a la pantalla de mapa principal
+                    final lat = (reporteData['latitud'] as num?)?.toDouble() ?? 4.1151;
+                    final lng = (reporteData['longitud'] as num?)?.toDouble() ?? -76.1976;
+                    final id = reporteData['id']?.toString();
+                    MapFocusService.instance.requestFocus(
+                      lat: lat,
+                      lng: lng,
+                      zoom: 16.0,
+                      reporteId: id,
+                    );
                     Navigator.popUntil(context, (route) => route.isFirst);
                   },
                   icon: const Icon(Icons.map_outlined, color: Colors.white, size: 18),

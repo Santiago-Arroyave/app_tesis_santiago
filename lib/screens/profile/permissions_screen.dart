@@ -104,8 +104,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
@@ -117,21 +118,21 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
               const SizedBox(height: 16),
 
               // 2. Título de pantalla
-              const Text(
+              Text(
                 "Permisos y ubicación",
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F3A22),
+                  color: isDark ? Colors.white : const Color(0xFF0F3A22),
                   letterSpacing: -0.4,
                 ),
               ),
               const SizedBox(height: 3),
-              const Text(
+              Text(
                 "Necesitamos algunos permisos para que puedas georreferenciar tus reportes y subir evidencias desde el campo.",
                 style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF4B5563),
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
                   height: 1.35,
                 ),
               ),
@@ -142,12 +143,12 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
               const SizedBox(height: 20),
 
               // 4. Lista de Permisos del Sistema
-              const Text(
+              Text(
                 "Permisos requeridos",
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F3A22),
+                  color: isDark ? Colors.white : const Color(0xFF0F3A22),
                 ),
               ),
               const SizedBox(height: 8),
@@ -168,10 +169,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
   // ===========================================================================
 
   Widget _buildInstitutionalHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(22),
         boxShadow: const [
           BoxShadow(
@@ -184,19 +186,25 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F3A22), size: 20),
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: isDark ? Colors.white : const Color(0xFF0F3A22),
+              size: 20,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           ClipOval(
             child: Image.asset(
-              'assets/images/Logo verde.png',
+              isDark
+                  ? 'assets/images/Logo Blanco.png'
+                  : 'assets/images/Logo verde.png',
               width: 36,
               height: 36,
               fit: BoxFit.contain,
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -206,17 +214,17 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F3A22),
+                    color: isDark ? Colors.white : const Color(0xFF0F3A22),
                     letterSpacing: -0.3,
                   ),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 1),
                 Text(
                   "PNR Páramo del Duende",
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF2E4F3E),
+                    color: isDark ? const Color(0xFFA3B899) : const Color(0xFF2E4F3E),
                   ),
                 ),
               ],
@@ -315,13 +323,16 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
   }
 
   Widget _buildPermissionsList() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_isLoading) {
       return Container(
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+          ),
         ),
         child: const Center(
           child: CircularProgressIndicator(color: Color(0xFF1E5E3A), strokeWidth: 2),
@@ -331,9 +342,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x08000000),
@@ -384,6 +397,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
     required bool isGranted,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -391,7 +405,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: isGranted ? const Color(0xFFE8F5E9) : const Color(0xFFF3F4F6),
+          color: isGranted
+              ? const Color(0xFFE8F5E9)
+              : isDark
+                  ? const Color(0xFF2A2A2A)
+                  : const Color(0xFFF3F4F6),
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -402,11 +420,18 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
       ),
       title: Text(
         title,
-        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+        style: TextStyle(
+          fontSize: 14.5,
+          fontWeight: FontWeight.bold,
+          color: isDark ? Colors.white : const Color(0xFF111827),
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+        style: TextStyle(
+          fontSize: 12,
+          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+        ),
       ),
       trailing: _buildStatusPill(isGranted),
     );
@@ -465,12 +490,15 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
   }
 
   Widget _buildManagementCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x08000000),
@@ -482,24 +510,28 @@ class _PermissionsScreenState extends State<PermissionsScreen> with WidgetsBindi
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.settings, color: Color(0xFF1E5E3A), size: 20),
-              SizedBox(width: 8),
+              const Icon(Icons.settings, color: Color(0xFF1E5E3A), size: 20),
+              const SizedBox(width: 8),
               Text(
                 "Gestionar permisos",
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F3A22),
+                  color: isDark ? Colors.white : const Color(0xFF0F3A22),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             "Puedes modificar estos permisos en la configuración de tu dispositivo en cualquier momento.",
-            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280), height: 1.35),
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 14),
           SizedBox(
