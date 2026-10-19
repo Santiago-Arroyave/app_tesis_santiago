@@ -1,0 +1,48 @@
+name: Compilar iOS GoblinPark
+
+on:
+  workflow_dispatch: # Permite ejecutar la compilación manualmente con un botón
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Instalar dependencias de Flutter
+        run: flutter pub get
+
+      - name: Instalar pods de iOS
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      - name: Compilar iOS (sin firma estricta)
+        run: flutter build ios --release --no-codesign
+
+      - name: Empaquetar Runner.app en ZIP
+        run: |
+          cd build/ios/iphoneos
+          zip -r GoblinPark-iOS.zip Runner.app
+          cd ../../..
+
+      - name: Subir artefacto compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoblinPark-iOS-App
+          path: build/ios/iphoneos/GoblinPark-iOS.zip
